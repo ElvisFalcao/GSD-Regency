@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Regency Project Manager</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+    <style>
+      :root{--ink:#1d3540;--muted:#7f969e;--line:#e7eeee;--soft:#f4f8f7;--green:#208197;--lime:#cdebed;--orange:#ec9a79;--red:#d2605f;--shadow:0 14px 34px rgba(47,86,99,.10)}
+      html{min-height:100%;background:#315a69}body{min-height:100vh;background:linear-gradient(135deg,#406d7e 0%,#315967 48%,#274e5d 100%)}body:before{content:'';position:fixed;inset:0;pointer-events:none;opacity:.15;background-image:radial-gradient(#d7edf0 1px,transparent 1px);background-size:19px 19px;mix-blend-mode:soft-light}.shell{position:relative;grid-template-columns:190px minmax(0,1fr);min-height:calc(100vh - 58px);max-width:1470px;margin:29px auto;padding:0 22px 0 0}aside{padding:23px 15px 25px 20px;color:#eef8f7;background:transparent}.brand{gap:10px;padding-left:3px;font:700 20px/1 'Fraunces',serif;letter-spacing:-.6px}.brand small{margin-top:5px;color:#c2d6d6;font:700 8px/1 'DM Sans',sans-serif;letter-spacing:1.25px}.brand-mark{display:grid!important;grid-template-columns:repeat(2,5px)!important;gap:2px;place-content:center;width:31px!important;height:31px!important;background:transparent!important}.brand-mark i{width:7px;height:7px;border-radius:50%;background:#f5f9f6}.brand-mark i:last-child{background:#f7d1c1}nav{margin-top:70px;gap:7px}.nav{display:flex;align-items:center;gap:13px;padding:12px 13px;border-radius:13px;color:#c8dbde;font:700 12px 'DM Sans',sans-serif;letter-spacing:.1px;transition:.2s ease}.nav:hover{color:#fff;transform:translateX(2px);background:rgba(255,255,255,.08)}.nav.active{color:#315a69;background:#fff;box-shadow:0 9px 20px rgba(18,55,66,.14)}.nav-icon{display:inline-grid;width:19px;place-items:center;font-size:17px;line-height:1}.aside-note{position:relative;padding:14px 10px 13px 25px;border:1px solid rgba(235,249,248,.17);border-radius:13px;color:#f8ffff;background:rgba(26,67,80,.24);font-size:11px;line-height:1.45}.aside-note small{color:#bdd3d5;font-weight:500}.aside-dot{position:absolute;left:10px;top:17px;width:7px!important;height:7px!important;border-radius:50%;background:#a5d5c4!important;box-shadow:0 0 0 3px rgba(165,213,196,.16)}main{min-width:0;padding:36px 42px 50px;background:#fff;border:1px solid rgba(255,255,255,.38);border-radius:24px;box-shadow:0 26px 60px rgba(21,50,61,.20)}header{min-height:52px;padding-bottom:27px;border-bottom:1px solid #edf2f1}.eyebrow{color:#208197;font-size:9px;letter-spacing:1.45px}h1,h2{color:#1d3540;font-family:'Fraunces',serif;letter-spacing:-.6px}h1{font-size:clamp(27px,2.6vw,36px);line-height:1.04}h2{font-size:22px}.primary,.secondary,.icon-button{border-radius:12px;font:700 12px 'DM Sans',sans-serif;transition:transform .18s ease,box-shadow .18s ease,background .18s ease}.primary:hover,.secondary:hover,.icon-button:hover{transform:translateY(-2px)}.primary{background:#208197;box-shadow:0 8px 16px rgba(32,129,151,.23)}.secondary,.icon-button{color:#315a69;background:#f5f9f8;border-color:#e4eeee}.stats{grid-template-columns:1.45fr 1fr 1fr 1fr;gap:13px;margin:28px 0 36px}.stat,.task-card,.campaign,.table-wrap,.settings-grid,.team-card{border-color:#e7eeee;box-shadow:0 14px 34px rgba(47,86,99,.10)}.stat{position:relative;min-height:148px;overflow:hidden;padding:21px 19px;border-radius:15px}.stat:nth-child(1){color:#fff;border-color:transparent;background:linear-gradient(120deg,#17849a,#65b8c0)}.stat:nth-child(1):after{content:'â—Œ';position:absolute;right:-14px;bottom:-27px;color:rgba(255,255,255,.25);font:150px/1 Georgia,serif}.stat:nth-child(2){background:#f7d1c1;border-color:#f3c4b1}.stat:nth-child(3){background:#cdebed;border-color:#bce1e3}.stat:nth-child(4){background:#f3e9d6;border-color:#eadfc9}.stat .eyebrow{color:inherit;opacity:.8}.stat .number{position:relative;z-index:1;margin-top:10px;font:700 42px/.95 'Fraunces',serif;letter-spacing:-2px}.stat .caption{position:relative;z-index:1;max-width:120px;margin-top:11px;color:inherit;opacity:.72;font-size:11px;line-height:1.25}.task-card{border-radius:13px;transition:transform .18s ease,box-shadow .18s ease}.task-card:hover{transform:translateY(-2px);border-color:#9bcfd4;box-shadow:0 14px 26px rgba(49,90,105,.13)}.task-mark{width:7px;border-radius:8px}.task-mark.Post{background:#208197}.task-mark.Boost{background:#ec9a79}.team-card{border-radius:14px;transition:transform .18s ease}.team-card:hover{transform:translateY(-2px)}.team-avatar{border-radius:12px;color:#315a69;background:#cdebed;font:700 15px 'Fraunces',serif}.team-card:nth-child(3n+2) .team-avatar{background:#f7d1c1}.team-card:nth-child(3n) .team-avatar{background:#f3e9d6}.team-card>b{color:#208197;font:700 25px/.9 'Fraunces',serif}.filterbar{padding:12px;border-radius:15px;background:#f5f9f8}.filterbar input,.filterbar select,select,input{border-color:#dfeaea;border-radius:9px}.filterbar input:focus,.filterbar select:focus,select:focus,input:focus{border-color:#79c6ce;box-shadow:0 0 0 3px rgba(121,198,206,.18)}.table-wrap{border-radius:15px}tbody tr:hover{background:#f4faf9}.campaign{position:relative;overflow:hidden;border-radius:15px}.campaign:after{content:'';position:absolute;width:95px;height:95px;right:-30px;top:-30px;border-radius:50%;background:#cdebed;opacity:.45}.campaign h3{position:relative;font:700 19px 'Fraunces',serif}.settings-grid{border-radius:15px}.setting{border-left-color:#79c6ce}dialog{border-radius:18px;box-shadow:0 28px 80px rgba(8,36,45,.42)}dialog::backdrop{background:rgba(31,76,89,.62);backdrop-filter:blur(3px)}#toast{background:#315a69;border-radius:11px}
+      @media(max-width:860px){.shell{grid-template-columns:1fr;margin:0;padding:0}.shell aside{padding:16px 20px;align-items:center;background:#315a69}.brand{font-size:18px}.brand small{display:none}nav{display:flex;margin:0 0 0 auto;gap:3px}.nav{width:auto;padding:8px}.nav>span:last-child{display:none}.nav-icon{font-size:16px}.aside-note{display:none}main{min-height:calc(100vh - 64px);padding:28px 20px 38px;border:0;border-radius:0}.stats{grid-template-columns:repeat(2,1fr)}.stat:first-child{grid-column:span 2}}@media(max-width:510px){main{padding:22px 14px 30px}h1{font-size:27px}.header-actions .secondary{display:none}.stats{grid-template-columns:1fr}.stat:first-child{grid-column:auto}.team-board{grid-template-columns:1fr}}
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="config.js"></script>
+  </head>
+  <body>
+    <div class="shell">
+      <aside>
+        <div class="brand"><span class="brand-mark"><i></i><i></i><i></i><i></i></span><div>Regency<small>PROJECT MANAGER</small></div></div>
+        <nav>
+          <button class="nav active" data-view="overview"><span class="nav-icon">â—«</span><span>Overview</span></button>
+          <button class="nav" data-view="tasks"><span class="nav-icon">âœ“</span><span>Tasks</span></button>
+          <button class="nav" data-view="campaigns"><span class="nav-icon">â—‡</span><span>Campaigns</span></button>
+          <button class="nav" data-view="reports"><span class="nav-icon">â–¤</span><span>Reports</span></button>
+          <button class="nav" data-view="settings"><span class="nav-icon">âš™</span><span>Workspace</span></button>
+        </nav>
+        <div class="aside-note"><span class="aside-dot"></span>Shalina Healthcare<br /><small>Africa/Johannesburg</small></div>
+      </aside>
+      <main>
+        <header><div><p class="eyebrow">OPERATIONS DESK</p><h1 id="pageTitle">Todayâ€™s operations</h1></div><div class="header-actions"><button id="notifications" class="icon-button" title="Notifications">ðŸ””<b id="notificationCount">0</b></button><button id="addTaskButton" class="secondary">+ Add task</button><button id="uploadButton" class="primary">Import budget plan</button></div></header>
+        <section id="overviewView" class="view">
+          <div id="statCards" class="stats"></div>
+          <div class="section-heading"><div><p class="eyebrow">PRIORITY QUEUE</p><h2>Work needing attention</h2></div><button id="seedDemo" class="secondary">Load Shalâ€™Artem example</button></div>
+          <div id="priorityTasks" class="task-list"></div>
+          <div class="section-heading"><div><p class="eyebrow">TEAM LOAD</p><h2>Who is working on what</h2></div><button class="secondary" data-view="tasks" id="viewAllTasks">View all tasks</button></div>
+          <div id="teamBoard" class="team-board"></div>
+        </section>
+        <section id="tasksView" class="view hidden">
+          <div class="filterbar">
+            <input id="taskSearch" placeholder="Search tasks" />
+            <select id="brandFilter"><option value="">All brands</option></select>
+            <select id="marketFilter"><option value="">All markets</option></select>
+            <select id="platformFilter"><option value="">All platforms</option></select>
+            <select id="assigneeFilter"><option value="">Everyone</option></select>
+            <select id="typeFilter"><option value="">All task types</option><option>Post</option><option>Boost</option><option>Report</option></select>
+            <select id="statusFilter"><option value="">All statuses</option><option>Not started</option><option>In progress</option><option>Blocked</option><option>Done</option></select>
+          </div>
+          <div id="taskTable" class="table-wrap"></div>
+        </section>
+        <section id="campaignsView" class="view hidden"><div class="section-heading"><div><p class="eyebrow">CAMPAIGNS</p><h2>Planning links and execution</h2></div></div><div id="campaignList" class="campaign-grid"></div></section>
+        <section id="reportsView" class="view hidden"><div class="section-heading"><div><p class="eyebrow">REPORTING</p><h2>Supermetrics and manual results</h2></div></div><div id="reportList" class="task-list"></div></section>
+        <section id="settingsView" class="view hidden"><div class="section-heading"><div><p class="eyebrow">WORKSPACE SETTINGS</p><h2>People, automation and channels</h2></div><div id="settingsPanel" class="settings-grid"></div></section>
+      </main>
+    </div>
+    <dialog id="importDialog"><form method="dialog" class="modal"><button class="close" value="cancel">Ã—</button><p class="eyebrow">SPREADSHEET IMPORT</p><h2>Turn a budget plan into work</h2><p>Choose a Brand, then upload the FluxPlanner Excel export. Subtotals are ignored and each valid row generates a post, boost and report task.</p><label>Brand<select id="importBrand"></select></label><label>Budget plan (.xlsx)<input id="fileInput" type="file" accept=".xlsx,.xls" /></label><div id="importPreview" class="preview"></div><button id="confirmImport" class="primary" value="default" disabled>Import valid activation rows</button></form></dialog>
+    <dialog id="taskDialog"><form method="dialog" class="modal"><button class="close" value="cancel">Ã—</button><p class="eyebrow" id="taskDialogType"></p><h2 id="taskDialogTitle"></h2><div id="taskDialogBody"></div><menu><button value="cancel" class="secondary">Close</button><button id="saveTask" value="default" class="primary">Save task</button></menu></form></dialog>
+    <div id="toast" role="status"></div>
+    <script type="module" src="app.js"></script>
+  </body>
+</html>
+
