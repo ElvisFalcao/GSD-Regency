@@ -1,0 +1,11 @@
+# Normalise line endings on commit so text files stay LF in the repository.
+# This also guards against the UTF-8 double-encoding that corrupted the first
+# upload of this project to GitHub.
+* text=auto eol=lf
+
+# Binary assets must never be normalised or diffed as text.
+*.xlsx binary
+*.docx binary
+*.png  binary
+*.jpg  binary
+*.pdf  binary

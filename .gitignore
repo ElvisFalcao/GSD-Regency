@@ -1,0 +1,13 @@
+.DS_Store
+.env
+.env.*
+!.env.example
+supabase/.temp/
+
+# Client material. This repository is PUBLIC — Shalina and Regency documents
+# must not be committed. Kept locally for working reference only.
+# If a spreadsheet is ever needed as a test fixture, add it deliberately with
+# `git add -f <path>` after confirming it contains no client data.
+*.xlsx
+*.docx
+*.pptx
