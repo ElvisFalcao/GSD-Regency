@@ -18,6 +18,14 @@ Deno.serve(async (request) => {
   const response = await fetch(`https://api.supermetrics.com/enterprise/v2/query/${mapping.supermetrics_query_id}/data/json`, { headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' } });
   if (!response.ok) { await supabase.from('pm_tasks').update({ report_state: 'Manual entry required' }).eq('id', taskId); return Response.json({ state: 'Manual entry required', providerStatus: response.status }, { headers: cors }); }
   const results = await response.json();
-  await supabase.from('pm_tasks').update({ report_state: 'Imported from Supermetrics', results, status: 'Done', updated_at: new Date().toISOString() }).eq('id', taskId);
+  // Pulled reporting data goes to pm_task_metrics, which only managers and the
+  // Community Manager can read. pm_tasks.results is left alone: it carries the
+  // granola meeting context that the whole team is meant to see.
+  const { error: metricsError } = await supabase.from('pm_task_metrics').upsert({
+    task_id: taskId, workspace_id: campaign.workspace_id, source: 'supermetrics',
+    metrics: results, fetched_at: new Date().toISOString()
+  });
+  if (metricsError) return Response.json({ error: metricsError.message }, { status: 500, headers: cors });
+  await supabase.from('pm_tasks').update({ report_state: 'Imported from Supermetrics', status: 'Done', updated_at: new Date().toISOString() }).eq('id', taskId);
   return Response.json({ state: 'Imported from Supermetrics', results }, { headers: cors });
 });
