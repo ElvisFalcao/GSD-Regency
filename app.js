@@ -47,7 +47,7 @@ function campaignOptions(selected = '') { return `<option value="">General / no 
 async function boot() {
   bindEvents();
   if (!configured) return startDemo();
-  client.auth.onAuthStateChange(() => refresh());
+  client.auth.onAuthStateChange(() => { refresh().catch((error) => { console.error(error); toast(error.message); }); });
   await refresh();
 }
 
@@ -327,10 +327,12 @@ function bindAdminControls() {
   });
 
   document.querySelectorAll('[data-level]').forEach((select) => {
-    select.onchange = async () => {
+    // reload() runs in the catch to put the control back to the stored value
+    // after a refusal, and could itself reject; guard() is the backstop.
+    select.onchange = guard(async () => {
       try { await db.setAccessLevel(select.dataset.level, select.value); await reload(); toast('Access level updated.'); }
       catch (error) { toast(error.message); await reload(); }
-    };
+    });
   });
 
   document.querySelectorAll('[data-role-slot]').forEach((chip) => {
@@ -480,6 +482,19 @@ function loadDemo() {
 
 // --- wiring --------------------------------------------------------------
 
+// An async click handler returns a promise nobody awaits. If it rejects, the
+// browser reports an unhandled rejection to the console and the interface shows
+// nothing at all — the button simply appears dead. Every async handler goes
+// through this so a failure always reaches the person who clicked.
+function guard(handler, onError) {
+  return (event) => {
+    try {
+      const result = handler(event);
+      if (result?.catch) result.catch((error) => { console.error(error); (onError || toast)(error.message); });
+    } catch (error) { console.error(error); (onError || toast)(error.message); }
+  };
+}
+
 function bindEvents() {
   const titles = { overview: 'Today’s operations', tasks: 'Task command centre', campaigns: 'Campaigns', reports: 'Reporting queue', settings: 'Workspace settings' };
   document.querySelectorAll('.nav').forEach((b) => {
@@ -492,20 +507,26 @@ function bindEvents() {
     };
   });
   $('importBrand').innerHTML = brandOptions();
-  $('authForm').onsubmit = submitGate;
+  $('authForm').onsubmit = guard(submitGate, authError);
   $('authSecondary').onclick = () => showGate(authMode === 'signin' ? 'signup' : 'signin');
-  $('signOut').onclick = signOut;
+  $('signOut').onclick = guard(signOut);
   $('uploadButton').onclick = () => $('importDialog').showModal();
   $('addTaskButton').onclick = newTask;
   $('fileInput').onchange = (e) => e.target.files[0] && previewWorkbook(e.target.files[0]);
   $('importBrand').onchange = () => { const file = $('fileInput').files[0]; if (file) previewWorkbook(file); };
-  $('confirmImport').onclick = (event) => { event.preventDefault(); importRows(); };
-  $('seedDemo').onclick = loadDemo;
-  $('saveTask').onclick = async (event) => { event.preventDefault(); if (await saveTask()) $('taskDialog').close(); };
+  $('confirmImport').onclick = guard((event) => { event.preventDefault(); return importRows(); }, importError);
+  $('seedDemo').onclick = guard(loadDemo);
+  $('saveTask').onclick = guard(async (event) => { event.preventDefault(); if (await saveTask()) $('taskDialog').close(); });
   $('notifications').onclick = () => { document.querySelector('[data-view="overview"]').click(); window.scrollTo({ top: 0, behavior: 'smooth' }); };
   $('viewAllTasks').onclick = () => document.querySelector('[data-view="tasks"]').click();
   ['taskSearch', 'brandFilter', 'marketFilter', 'platformFilter', 'assigneeFilter', 'typeFilter', 'statusFilter']
     .forEach((id) => $(id).addEventListener(id === 'taskSearch' ? 'input' : 'change', renderTasks));
 }
 
-boot();
+// A rejection here would otherwise leave the page blank with nothing but a
+// console entry to explain it.
+boot().catch((error) => {
+  console.error('Startup failed:', error);
+  if (configured) showGate('signin', `Could not start: ${error.message}`);
+  else toast(`Could not start: ${error.message}`);
+});
