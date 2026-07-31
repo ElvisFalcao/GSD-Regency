@@ -30,7 +30,7 @@
         <div class="aside-note"><span class="aside-dot"></span>Shalina Healthcare<br /><small>Africa/Johannesburg</small></div>
       </aside>
       <main>
-        <header><div><p class="eyebrow">OPERATIONS DESK</p><h1 id="pageTitle">Today’s operations</h1></div><div class="header-actions"><button id="notifications" class="icon-button" title="Notifications">🔔<b id="notificationCount">0</b></button><button id="addTaskButton" class="secondary">+ Add task</button><button id="uploadButton" class="primary">Import budget plan</button></div></header>
+        <header><div><p class="eyebrow">OPERATIONS DESK</p><h1 id="pageTitle">Today’s operations</h1></div><div class="header-actions"><button id="notifications" class="icon-button" title="Notifications">🔔<b id="notificationCount">0</b></button><button id="addTaskButton" class="secondary">+ Add task</button><button id="uploadButton" class="primary">Import budget plan</button><div id="whoami" class="whoami hidden"><span id="whoamiName"></span><small id="whoamiRole"></small><button id="signOut" class="linklike" type="button">Sign out</button></div></div></header>
         <section id="overviewView" class="view">
           <div id="statCards" class="stats"></div>
           <div class="section-heading"><div><p class="eyebrow">PRIORITY QUEUE</p><h2>Work needing attention</h2></div><button id="seedDemo" class="secondary">Load Shal’Artem example</button></div>
@@ -58,6 +58,21 @@
     <dialog id="importDialog"><form method="dialog" class="modal"><button class="close" value="cancel">×</button><p class="eyebrow">SPREADSHEET IMPORT</p><h2>Turn a budget plan into work</h2><p>Choose a Brand, then upload the FluxPlanner Excel export. Subtotals are ignored and each valid row generates a post, boost and report task.</p><label>Brand<select id="importBrand"></select></label><label>Budget plan (.xlsx)<input id="fileInput" type="file" accept=".xlsx,.xls" /></label><div id="importPreview" class="preview"></div><button id="confirmImport" class="primary" value="default" disabled>Import valid activation rows</button></form></dialog>
     <dialog id="taskDialog"><form method="dialog" class="modal"><button class="close" value="cancel">×</button><p class="eyebrow" id="taskDialogType"></p><h2 id="taskDialogTitle"></h2><div id="taskDialogBody"></div><menu><button value="cancel" class="secondary">Close</button><button id="saveTask" value="default" class="primary">Save task</button></menu></form></dialog>
     <div id="toast" role="status"></div>
+    <div id="authGate" class="auth-gate hidden">
+      <form id="authForm" class="auth-card" autocomplete="on">
+        <div class="brand"><span class="brand-mark"><i></i><i></i><i></i><i></i></span><div>Regency<small>PROJECT MANAGER</small></div></div>
+        <p class="eyebrow" id="authEyebrow">SHALINA HEALTHCARE</p>
+        <h2 id="authTitle">Sign in</h2>
+        <p id="authIntro">Use your Regency email address.</p>
+        <div id="authFields">
+          <label>Email<input id="authEmail" type="email" autocomplete="email" required /></label>
+          <label>Password<input id="authPassword" type="password" autocomplete="current-password" minlength="8" required /></label>
+        </div>
+        <p id="authError" class="error" role="alert"></p>
+        <button id="authSubmit" class="primary" type="submit">Sign in</button>
+        <button id="authSecondary" class="secondary" type="button">Create an account</button>
+      </form>
+    </div>
     <script type="module" src="app.js"></script>
   </body>
 </html>
