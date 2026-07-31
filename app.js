@@ -1,4 +1,4 @@
-import { BRAND_CATALOG, PLATFORM_IDS, WORKFLOW_TEMPLATE, normaliseRows, validateActivation, createActivationTasks, taskFlags } from './lib/automation.js';
+import { BRAND_CATALOG, PLATFORM_IDS, WORKFLOW_TEMPLATE, normaliseRows, validateActivation, createActivationTasks, taskFlags, findHeaderRow } from './lib/automation.js';
 import { createDataLayer, capabilities } from './lib/data.js';
 
 const cfg = window.PM_CONFIG || {};
@@ -409,7 +409,12 @@ function previewWorkbook(file) {
     try {
       if (!window.XLSX) throw new Error('The spreadsheet library did not load. Check your connection and reload.');
       const book = window.XLSX.read(event.target.result, { type: 'array', cellDates: true });
-      const rows = normaliseRows(window.XLSX.utils.sheet_to_json(book.Sheets[book.SheetNames[0]], { defval: '' }));
+      const sheet = book.Sheets[book.SheetNames[0]];
+      // Not every plan starts with its headings; some open with a title row.
+      const headerRow = findHeaderRow(window.XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' }));
+      if (headerRow < 0) throw new Error('Could not find the heading row. The sheet needs columns named DATE, ACTIVATION, PLATFORM and Country in one row.');
+      const rows = normaliseRows(window.XLSX.utils.sheet_to_json(sheet, { range: headerRow, defval: '' }));
+      if (!rows.length) throw new Error(`Found headings on row ${headerRow + 1}, but no row below them had a date, an activation and a platform.`);
       const brand = $('importBrand').value;
       preview = rows.map((row) => ({ ...row, error: validateActivation({ ...row, brand }) }));
       const valid = preview.filter((r) => !r.error);

@@ -1,6 +1,34 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { addBusinessDays, createActivationTasks, normaliseRows, validateActivation } from '../lib/automation.js';
+import { addBusinessDays, createActivationTasks, normaliseRows, validateActivation, findHeaderRow, parseMoney } from '../lib/automation.js';
+
+test('finds the heading row when a plan opens with a title', () => {
+  // The IBUCAP plan puts "IBUCAP Cold & Flu" on row 1, which made every column
+  // parse as _1, _2, _3 and silently discarded all 56 rows.
+  assert.equal(findHeaderRow([
+    ['IBUCAP Cold & Flu', '', '', ''],
+    ['DATE', '', 'ACTIVATION', 'ASSET TYPE', 'PLATFORM', 'Country'],
+    ['17/07/2026', 'Friday', 'Teaser', 'Video', 'TikTok', 'Nigeria']
+  ]), 1);
+  assert.equal(findHeaderRow([['DATE', 'ACTIVATION', 'PLATFORM']]), 0);
+  assert.equal(findHeaderRow([['Total spend', ''], ['', '']]), -1);
+});
+
+test('reads money however the sheet formats it', () => {
+  assert.equal(parseMoney('$225.81'), 225.81);   // IBUCAP plan
+  assert.equal(parseMoney('R3 511,29'), 3511.29); // rand, comma decimal
+  assert.equal(parseMoney('1,234.56'), 1234.56);
+  assert.equal(parseMoney('1.234,56'), 1234.56);
+  assert.equal(parseMoney(120), 120);
+  assert.equal(parseMoney(''), 0);
+  assert.equal(parseMoney('n/a'), 0);
+});
+
+test('a text budget does not import as zero', () => {
+  const [row] = normaliseRows([{ DATE: '17/07/2026', ACTIVATION: 'Teaser', PLATFORM: 'TikTok', Country: 'Nigeria', BUDGET: '$225.81', 'ACTUAL SPEND': 'R1 000,50' }]);
+  assert.equal(row.budget, 225.81);
+  assert.equal(row.actualSpend, 1000.5);
+});
 
 test('blocks TikTok outside Nigeria and South Africa', () => {
   assert.match(validateActivation({ brand: 'Germol', market: 'Angola', platform: 'TikTok', date: '2026-07-24', activation: 'Teaser' }), /not available/);
