@@ -1,4 +1,4 @@
-import { BRAND_CATALOG, PLATFORM_IDS, WORKFLOW_TEMPLATE, normaliseRows, validateActivation, createActivationTasks, taskFlags, findHeaderRow } from './lib/automation.js';
+import { BRAND_CATALOG, PLATFORM_IDS, WORKFLOW_TEMPLATE, normaliseRows, validateActivation, createActivationTasks, taskFlags, findHeaderRow, groupContentTasks } from './lib/automation.js';
 import { createDataLayer, capabilities } from './lib/data.js';
 
 const cfg = window.PM_CONFIG || {};
@@ -207,6 +207,22 @@ function renderOverview() {
     ['Reports due', flags.filter((f) => f.reportDue).length, 'results awaiting capture']
   ];
   $('statCards').innerHTML = cards.map(([label, value, caption]) => `<article class="stat"><p class="eyebrow">${label}</p><div class="number">${value}</div><div class="caption">${caption}</div></article>`).join('');
+  // Pre-assigned work is a proposal the plan made, not a decision anyone took.
+  // It sits at the top until a manager agrees to it.
+  const proposed = state.tasks.filter((t) => t.assignmentState === 'proposed');
+  $('proposalBar').innerHTML = proposed.length && can.isManager
+    ? `<div><b>${proposed.length} pre-assigned tasks</b> were routed from the plan by asset type. Check the owners, then confirm.</div><button id="confirmAll" class="primary" type="button">Confirm all</button>`
+    : '';
+  $('proposalBar').classList.toggle('hidden', !proposed.length || !can.isManager);
+  if (proposed.length && can.isManager) {
+    $('confirmAll').onclick = guard(async () => {
+      if (!db) { proposed.forEach((t) => { t.assignmentState = 'confirmed'; }); persistDemo(); render(); return toast('Assignments confirmed.'); }
+      const saved = await db.confirmAssignments(proposed.map((t) => t.id));
+      saved.forEach((task) => { const i = state.tasks.findIndex((t) => t.id === task.id); if (i >= 0) state.tasks[i] = task; });
+      render(); toast(`Confirmed ${saved.length} assignments.`);
+    });
+  }
+
   const priority = state.tasks.filter((t) => { const f = taskStatus(t); return f.overdue || f.boostToday || f.reportDue || t.dueDate === today(); }).sort((a, b) => a.dueDate.localeCompare(b.dueDate));
   $('priorityTasks').innerHTML = priority.length
     ? priority.map(taskCard).join('')
@@ -222,7 +238,8 @@ function renderOverview() {
 function taskCard(t) {
   const f = taskStatus(t);
   const context = [campaignName(t.campaignId), t.market, t.platform].filter(Boolean).join(' · ') || 'General task';
-  return `<article class="task-card" data-task-id="${t.id}"><div class="task-mark ${t.type}"></div><div><h3>${escape(t.title)}</h3><p>${escape(context)} · <span class="badge ${t.type}">${t.type || 'To-do'}</span> · ${escape(memberName(t.assigneeId))}</p></div><div class="due ${f.overdue ? 'overdue' : ''}">${f.overdue ? 'Overdue · ' : ''}${escape(t.dueDate)}<br><span class="badge">${escape(t.status)}</span></div></article>`;
+  const proposed = t.assignmentState === 'proposed' ? '<span class="badge proposed">pre-assigned</span> · ' : '';
+  return `<article class="task-card" data-task-id="${t.id}"><div class="task-mark ${t.type}"></div><div><h3>${escape(t.title)}</h3><p>${escape(context)} · <span class="badge ${t.type}">${t.type || 'To-do'}</span> · ${proposed}${escape(memberName(t.assigneeId))}</p></div><div class="due ${f.overdue ? 'overdue' : ''}">${f.overdue ? 'Overdue · ' : ''}${escape(t.dueDate)}<br><span class="badge">${escape(t.status)}</span></div></article>`;
 }
 
 function bindTaskCards() { document.querySelectorAll('[data-task-id]').forEach((el) => { el.onclick = () => openTask(el.dataset.taskId); }); }
@@ -441,19 +458,22 @@ async function importRows() {
   if (!db) {
     const campaignId = `demo-${crypto.randomUUID()}`;
     state.campaigns.unshift({ id: campaignId, ...details, division: BRAND_CATALOG[brand]?.division, source: 'spreadsheet' });
-    state.tasks.unshift(...valid.flatMap((row) => createActivationTasks(row, campaignId, owner)));
+    const content = groupContentTasks(valid, campaignId).map((task, index) => ({ ...task, id: `demo-content-${index}`, assigneeId: memberWithRole(task.roleSlot), assignmentState: 'proposed' }));
+    const work = valid.flatMap((row) => createActivationTasks(row, campaignId, owner).map((t) => ({ ...t, assignmentState: 'proposed' })));
+    state.tasks.unshift(...content, ...work);
     persistDemo(); render(); $('importDialog').close();
-    return toast(`Imported ${valid.length} activations and generated ${valid.length * 3} tasks.`);
+    return toast(`Imported ${valid.length} activations: ${content.length} assets and ${work.length} operational tasks.`);
   }
   if (!owner) return importError('No one holds the Paid Media Owner role, so imported tasks would have no owner. Assign it in Workspace settings first.');
 
   $('confirmImport').disabled = true;
   importError('');
   try {
-    const { campaign, tasks } = await db.importCampaign(details, valid, owner);
+    const { campaign, tasks } = await db.importCampaign(details, valid, { paidMediaOwnerId: owner, resolveRole: memberWithRole });
     state.campaigns.unshift(campaign); state.tasks.unshift(...tasks);
     render(); $('importDialog').close();
-    toast(`Imported ${valid.length} activations and generated ${tasks.length} tasks.`);
+    const proposed = tasks.filter((t) => t.assignmentState === 'proposed').length;
+    toast(`Imported ${valid.length} activations into ${tasks.length} tasks. ${proposed} are pre-assigned and waiting for you to confirm.`);
   } catch (error) {
     // Kept in the dialog rather than a toast: an import failure is something to
     // read and act on, not a message that disappears after three seconds.

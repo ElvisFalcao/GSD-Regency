@@ -43,3 +43,12 @@
 .role-chip{padding:4px 9px;border:1px solid #dfeaea;border-radius:20px;background:#f5f9f8;color:#7f969e;font:600 10px 'DM Sans',sans-serif;cursor:pointer}
 .role-chip.on{border-color:#79c6ce;background:#cdebed;color:#1d3540}
 .import-error{margin-bottom:10px;padding:11px 13px;border:1px solid #f0c3c2;border-radius:10px;background:#fdf2f2;color:#a63a39;font-size:12px;line-height:1.5;white-space:pre-wrap}
+
+/* Pre-assigned work awaiting confirmation */
+.proposal-bar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;margin:22px 0 0;padding:14px 18px;border:1px solid #f3c4b1;border-radius:14px;background:#fdf1ea;color:#8a4a2c;font-size:12px;line-height:1.5}
+.proposal-bar.hidden{display:none}
+.proposal-bar b{color:#6f3a21}
+.proposal-bar button{padding:8px 15px;border:0;border-radius:10px;font:700 11px 'DM Sans',sans-serif;cursor:pointer}
+.badge.proposed{background:#f7d1c1;color:#8a4a2c}
+.task-mark.Content{background:#8fbf6b}
+.badge.Content{background:#e3f0d6;color:#4a6b33}
