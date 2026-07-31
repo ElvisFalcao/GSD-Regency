@@ -423,8 +423,10 @@ function previewWorkbook(file) {
 
 async function importRows() {
   const brand = $('importBrand').value;
+  if (!brand) return importError('Choose a brand before importing — eligibility is checked against it.');
   const valid = preview.filter((r) => !validateActivation({ ...r, brand }));
-  if (!brand || !valid.length) return;
+  if (!valid.length) return importError('No rows passed validation, so there is nothing to import.');
+  if (db && !can.isManager) return importError('Only Shane, Elvis or Zaida can import a plan.');
   const markets = [...new Set(valid.map((r) => r.market))];
   const details = { brand, name: `${brand} · ${valid[0].activation} plan`, market: markets.length === 1 ? markets[0] : 'Multiple markets' };
   const owner = memberWithRole('Paid Media Owner');
@@ -436,12 +438,32 @@ async function importRows() {
     persistDemo(); render(); $('importDialog').close();
     return toast(`Imported ${valid.length} activations and generated ${valid.length * 3} tasks.`);
   }
+  if (!owner) return importError('No one holds the Paid Media Owner role, so imported tasks would have no owner. Assign it in Workspace settings first.');
+
+  $('confirmImport').disabled = true;
+  importError('');
   try {
     const { campaign, tasks } = await db.importCampaign(details, valid, owner);
     state.campaigns.unshift(campaign); state.tasks.unshift(...tasks);
     render(); $('importDialog').close();
     toast(`Imported ${valid.length} activations and generated ${tasks.length} tasks.`);
-  } catch (error) { toast(error.message); }
+  } catch (error) {
+    // Kept in the dialog rather than a toast: an import failure is something to
+    // read and act on, not a message that disappears after three seconds.
+    console.error('Import failed:', error);
+    importError(error.message);
+  } finally { $('confirmImport').disabled = false; }
+}
+
+function importError(message) {
+  const el = $('importPreview');
+  const existing = el.querySelector('.import-error');
+  if (existing) existing.remove();
+  if (!message) return;
+  const box = document.createElement('div');
+  box.className = 'import-error';
+  box.textContent = message;
+  el.prepend(box);
 }
 
 function loadDemo() {

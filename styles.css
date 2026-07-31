@@ -42,3 +42,4 @@
 .role-chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:5px}
 .role-chip{padding:4px 9px;border:1px solid #dfeaea;border-radius:20px;background:#f5f9f8;color:#7f969e;font:600 10px 'DM Sans',sans-serif;cursor:pointer}
 .role-chip.on{border-color:#79c6ce;background:#cdebed;color:#1d3540}
+.import-error{margin-bottom:10px;padding:11px 13px;border:1px solid #f0c3c2;border-radius:10px;background:#fdf2f2;color:#a63a39;font-size:12px;line-height:1.5;white-space:pre-wrap}
