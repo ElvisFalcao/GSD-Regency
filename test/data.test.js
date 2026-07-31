@@ -72,10 +72,46 @@ test('plans post, boost and report so each learns the previous id', () => {
   assert.equal(steps[2].dependsOnIndex, 1);
 });
 
+test('requesting access does not write the email that would collide', async () => {
+  let captured = null;
+  const db = createDataLayer(fakeClient('comms@regency.global', (payload) => { captured = payload; }), { workspaceId: 'regency-shalina' });
+  await db.requestAccess();
+  // Zaida's seeded row already holds comms@regency.global, and 0001 made
+  // (workspace_id, lower(email)) unique. Writing it here is a duplicate key.
+  assert.equal(captured.email, undefined);
+  assert.equal(captured.display_name, 'comms@regency.global');
+  assert.equal(captured.access_level, 'pending');
+  assert.equal(captured.user_id, 'auth-1');
+});
+
+test('asking for access twice is not an error', async () => {
+  const db = createDataLayer(fakeClient('comms@regency.global', () => {}, { code: '23505', message: 'duplicate key' }), { workspaceId: 'regency-shalina' });
+  assert.equal(await db.requestAccess(), null);
+});
+
+test('other insert failures still surface', async () => {
+  const db = createDataLayer(fakeClient('comms@regency.global', () => {}, { code: '42501', message: 'permission denied' }), { workspaceId: 'regency-shalina' });
+  await assert.rejects(() => db.requestAccess(), /permission denied/);
+});
+
 test('refuses to build without a client or workspace', () => {
   assert.throws(() => createDataLayer(null, { workspaceId: 'regency-shalina' }), /Supabase client/);
   assert.throws(() => createDataLayer({}, {}), /workspaceId/);
 });
+
+// Minimal stand-in for the Supabase client: records what would be inserted and
+// replays whichever error the test is interested in.
+function fakeClient(email, onInsert, error = null) {
+  return {
+    auth: { getUser: async () => ({ data: { user: { id: 'auth-1', email } } }) },
+    from: () => ({
+      insert(payload) {
+        onInsert(payload);
+        return { select: () => ({ single: async () => ({ data: error ? null : { id: 'm9', display_name: email, access_level: 'pending' }, error }) }) };
+      }
+    })
+  };
+}
 
 function toMemberWith(accessLevel, roles) {
   const member = toMember({ id: 'm1', display_name: 'Test', access_level: accessLevel });

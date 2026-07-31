@@ -223,7 +223,7 @@ function renderReports() {
 function renderSettings() {
   const pending = state.members.filter((m) => m.accessLevel === 'pending');
   const waiting = pending.length
-    ? `<ul>${pending.map((m) => `<li>${escape(m.name)} — ${escape(m.email)}</li>`).join('')}</ul><p>Link them and grant roles in Supabase; the admin screen for this comes with step 4.</p>`
+    ? `<ul>${pending.map((m) => `<li>${escape(m.name)}${m.email ? ` — ${escape(m.email)}` : ''}</li>`).join('')}</ul><p>A pending person is listed by the address they registered with. Link them to their member row and grant roles in Supabase; the admin screen for this comes with step 4.</p>`
     : '<p>Nobody is waiting for approval.</p>';
   $('settingsPanel').innerHTML = `<section class="setting"><h3>Waiting for access</h3>${waiting}</section>`
     + `<section class="setting"><h3>Team and roles</h3><ul>${state.members.map((m) => `<li>${escape(m.name)} — ${escape(m.accessLevel)}${m.roles?.length ? ` · ${escape(m.roles.join(', '))}` : ''}</li>`).join('')}</ul></section>`
