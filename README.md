@@ -28,7 +28,7 @@ npm test
 
 ## Deploy to Supabase
 
-1. Run [`supabase/schema.sql`](supabase/schema.sql) in the existing FluxPlanner project’s SQL editor.
+1. Run [`supabase/schema.sql`](supabase/schema.sql) in the existing FluxPlanner project’s SQL editor, then every file in [`supabase/migrations/`](supabase/migrations) in numeric order. The migrations are the source of truth — `schema.sql` alone leaves the permissive RLS policies in place.
 2. Deploy `report-sync`, `dispatch-reminders`, and `fluxplanner-sync` from `supabase/functions/`.
 3. Add secrets: `SUPERMETRICS_API_KEY`, `RESEND_API_KEY`, `RESEND_FROM`, and the supplied Supabase defaults. Configure a daily Cron trigger for `dispatch-reminders`.
 4. Verify `regency.global` in Resend and use the configured sender, e.g. `socalpr@regency.global` or a dedicated `notifications@regency.global` address.

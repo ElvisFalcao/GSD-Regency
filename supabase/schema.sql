@@ -1,3 +1,14 @@
+-- SUPERSEDED. This file is the original bootstrap only, kept for history.
+--
+-- Do not run it on its own. Its RLS policies are the `using (true)` ones that
+-- let any authenticated FluxPlanner user read and delete all Regency data, and
+-- it predates pm_member_roles, access levels, pm_task_financials and
+-- pm_task_metrics. Applying it after the migrations would recreate the dropped
+-- pm_tasks.budget column.
+--
+-- The source of truth is supabase/migrations/, applied in order. To rebuild
+-- from nothing: run this file first, then every migration in sequence.
+--
 -- Run in the existing FluxPlanner Supabase project. Existing `plans` and `profiles`
 -- tables remain untouched; all Project Manager tables use the pm_ prefix.
 create extension if not exists pgcrypto;
