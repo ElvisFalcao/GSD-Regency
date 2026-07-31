@@ -20,6 +20,10 @@ const DEMO_MEMBERS = [
   { id: 'nikki', name: 'Nikki Dickson', title: 'Bookkeeping', accessLevel: 'member', roles: ['Bookkeeping'] }
 ];
 
+// Every role the workspace can grant: the workflow stages plus Bookkeeping,
+// which is real work (Nikki reconciles spend) but not a content stage.
+const ROLE_SLOTS = [...new Set([...WORKFLOW_TEMPLATE.map((s) => s.role), 'Bookkeeping'])].sort();
+
 let state = { members: [], campaigns: [], tasks: [], member: null };
 let can = capabilities(null);
 let preview = [];
@@ -54,11 +58,12 @@ async function refresh() {
   let member = null;
   try { member = await db.currentMember(); } catch (error) { return showGate('signin', error.message); }
 
-  // Signed in but not part of the workspace yet. The row is theirs to create;
-  // the insert policy pins it to 'pending' so it cannot arrive with access.
-  if (!member) return showGate('request');
+  // Signed in but not yet part of the workspace. Rather than a bare panel, show
+  // what Regency does and which brands it runs — none of which needs the
+  // database, since BRAND_CATALOG is a client-side constant. Operational data
+  // stays hidden, and RLS would refuse it anyway.
   can = capabilities(member);
-  if (!can.isActive) return showGate('pending');
+  if (!member || !can.isActive) { hideGate(); state = { members: [], campaigns: [], tasks: [], member }; return renderWelcome(member); }
 
   hideGate();
   try {
@@ -70,10 +75,46 @@ async function refresh() {
 
 const GATES = {
   signin: { title: 'Sign in', intro: 'Use your Regency email address.', submit: 'Sign in', secondary: 'Create an account', fields: true },
-  signup: { title: 'Create an account', intro: 'Register with your Regency email. A manager links you to the workspace before anything unlocks.', submit: 'Create account', secondary: 'I already have an account', fields: true },
-  request: { title: 'Request access', intro: 'Your account exists but is not linked to the Shalina workspace yet.', submit: 'Request access', secondary: 'Sign out', fields: false },
-  pending: { title: 'Waiting for approval', intro: 'Shane, Elvis or Zaida will assign your roles. Your work appears here once they do.', submit: '', secondary: 'Sign out', fields: false }
+  signup: { title: 'Create an account', intro: 'Register with your Regency email. A manager links you to the workspace before anything unlocks.', submit: 'Create account', secondary: 'I already have an account', fields: true }
 };
+
+// Shown to anyone signed in but not yet active: registered and waiting, or
+// linked but disabled. Deliberately orienting rather than a dead end.
+function renderWelcome(member) {
+  document.querySelectorAll('.view').forEach((v) => v.classList.add('hidden'));
+  $('welcomeView').classList.remove('hidden');
+  document.querySelectorAll('.nav').forEach((n) => n.classList.add('hidden'));
+  $('pageTitle').textContent = 'Welcome to Regency';
+  $('addTaskButton').classList.add('hidden');
+  $('uploadButton').classList.add('hidden');
+  $('seedDemo').classList.add('hidden');
+  $('whoami').classList.remove('hidden');
+  $('whoamiName').textContent = member?.name || 'Signed in';
+  $('whoamiRole').textContent = member ? 'Awaiting approval' : 'Not linked yet';
+  $('notificationCount').textContent = '0';
+
+  const waiting = member
+    ? '<span class="welcome-status">◷ Waiting for Shane, Elvis or Zaida to approve you</span>'
+    : '<button id="requestAccess" class="secondary" type="button">Request access to this workspace</button>';
+  const brands = Object.entries(BRAND_CATALOG).map(([brand, info]) => `<article class="brand-tile"><p class="eyebrow">${escape(info.division)}</p><h3>${escape(brand)}</h3><p>${escape(info.markets.join(', '))}</p></article>`).join('');
+
+  $('welcomePanel').innerHTML = `<div class="welcome-lead">
+      <h2>Regency · Shalina Healthcare</h2>
+      <p>This is where Regency runs the Shalina account: campaign plans become Post, Boost and Report tasks with owners and deadlines, alongside the everyday work that is not tied to a campaign. Once you are approved you will see what is assigned to you and what the rest of the team is working on.</p>
+      ${waiting}
+    </div>
+    <div><p class="eyebrow">BRANDS WE RUN</p><div class="brand-grid">${brands}</div></div>
+    <div><p class="eyebrow">HOW WORK FLOWS</p><div class="brand-grid">${WORKFLOW_TEMPLATE.slice(0, 6).map((s) => `<article class="brand-tile"><p class="eyebrow">STAGE ${s.order}</p><h3>${escape(s.name)}</h3><p>${escape(s.role)}</p></article>`).join('')}</div></div>`;
+
+  const request = $('requestAccess');
+  if (request) {
+    request.onclick = async () => {
+      request.disabled = true;
+      try { await db.requestAccess(); await refresh(); }
+      catch (error) { toast(error.message); request.disabled = false; }
+    };
+  }
+}
 
 function showGate(mode, message = '') {
   authMode = mode;
@@ -105,9 +146,6 @@ async function submitGate(event) {
       if (error) throw error;
       // A session may not exist yet if the project requires email confirmation.
       return showGate('signin', 'Account created. Confirm your email if prompted, then sign in.');
-    } else if (authMode === 'request') {
-      await db.requestAccess();
-      return showGate('pending');
     }
     await refresh();
   } catch (error) { authError(error.message); }
@@ -144,6 +182,9 @@ function render() {
 // Hiding a control is a courtesy, not a control. Every rule below is enforced
 // again by row-level security, which is what actually refuses the request.
 function applyCapabilities() {
+  // renderWelcome hides every nav item; an active member gets them back.
+  document.querySelectorAll('.nav').forEach((n) => n.classList.remove('hidden'));
+  $('welcomeView').classList.add('hidden');
   $('whoami').classList.toggle('hidden', !state.member);
   if (state.member) {
     $('whoamiName').textContent = state.member.name;
@@ -222,13 +263,86 @@ function renderReports() {
 
 function renderSettings() {
   const pending = state.members.filter((m) => m.accessLevel === 'pending');
-  const waiting = pending.length
-    ? `<ul>${pending.map((m) => `<li>${escape(m.name)}${m.email ? ` — ${escape(m.email)}` : ''}</li>`).join('')}</ul><p>A pending person is listed by the address they registered with. Link them to their member row and grant roles in Supabase; the admin screen for this comes with step 4.</p>`
-    : '<p>Nobody is waiting for approval.</p>';
-  $('settingsPanel').innerHTML = `<section class="setting"><h3>Waiting for access</h3>${waiting}</section>`
-    + `<section class="setting"><h3>Team and roles</h3><ul>${state.members.map((m) => `<li>${escape(m.name)} — ${escape(m.accessLevel)}${m.roles?.length ? ` · ${escape(m.roles.join(', '))}` : ''}</li>`).join('')}</ul></section>`
-    + `<section class="setting"><h3>Role templates</h3><ul>${WORKFLOW_TEMPLATE.map((s) => `<li>${s.order}. ${s.name} → ${s.role}</li>`).join('')}</ul></section>`
+  const team = state.members.filter((m) => m.accessLevel !== 'pending');
+  const unlinked = team.filter((m) => !m.userId);
+
+  // Approving means moving the auth account onto the person's real record, so
+  // their seeded roles and title are already waiting. pm_link_member does it in
+  // one statement; the alternative is approving someone into a duplicate row.
+  const requests = pending.length ? pending.map((m) => `<div class="admin-row">
+      <b>${escape(m.name)}</b><small>registered, not linked</small>
+      <select data-link-target="${m.id}">
+        <option value="">Link to…</option>
+        ${unlinked.map((t) => `<option value="${t.id}">${escape(t.name)} — ${escape(t.title || t.accessLevel)}</option>`).join('')}
+        <option value="__new">Approve as a new team member</option>
+      </select>
+      <button class="primary" data-link-confirm="${m.id}" type="button">Approve</button>
+      <button class="secondary" data-decline="${m.id}" type="button">Decline</button>
+    </div>`).join('') : '<p>Nobody is waiting for approval.</p>';
+
+  const roster = team.map((m) => {
+    const isSelf = m.id === state.member?.id;
+    const levels = ['owner', 'admin', 'member', 'disabled'];
+    return `<div class="admin-row">
+      <b>${escape(m.name)}</b><small>${escape(m.email || 'no address')}${m.userId ? '' : ' · no account yet'}</small>
+      <select data-level="${m.id}" ${isSelf || (m.accessLevel === 'owner' && !can.isOwner) ? 'disabled' : ''}>
+        ${levels.map((l) => `<option value="${l}" ${l === m.accessLevel ? 'selected' : ''}>${l}</option>`).join('')}
+      </select>
+      <div class="role-chips">${ROLE_SLOTS.map((slot) => `<span class="role-chip ${m.roles?.includes(slot) ? 'on' : ''}" data-role-member="${m.id}" data-role-slot="${escape(slot)}" role="button" tabindex="0">${escape(slot)}</span>`).join('')}</div>
+    </div>`;
+  }).join('');
+
+  $('settingsPanel').innerHTML = `<section class="setting"><h3>Waiting for access</h3>${requests}</section>`
+    + `<section class="setting"><h3>Team, access and roles</h3><p>Click a role to grant or remove it. Access level cannot be changed on your own account.</p>${roster}</section>`
+    + `<section class="setting"><h3>Workflow stages</h3><ul>${WORKFLOW_TEMPLATE.map((s) => `<li>${s.order}. ${s.name} → ${s.role}</li>`).join('')}</ul></section>`
     + '<section class="setting"><h3>Notification channels</h3><p><b>In-app:</b> active<br><b>Email:</b> configure Resend secret + verified sender<br><b>Teams:</b> inactive until IT approves a scoped channel integration.</p></section>';
+
+  bindAdminControls();
+}
+
+function bindAdminControls() {
+  if (!db) return;
+  const reload = async () => { state.members = await db.listMembers(); render(); };
+
+  document.querySelectorAll('[data-link-confirm]').forEach((button) => {
+    button.onclick = async () => {
+      const pendingId = button.dataset.linkConfirm;
+      const choice = document.querySelector(`[data-link-target="${pendingId}"]`)?.value;
+      if (!choice) return toast('Choose who this person is first.');
+      button.disabled = true;
+      try {
+        if (choice === '__new') await db.approveNewMember(pendingId, { email: state.members.find((m) => m.id === pendingId)?.name });
+        else await db.linkMember(pendingId, choice);
+        await reload(); toast('Access approved.');
+      } catch (error) { toast(error.message); button.disabled = false; }
+    };
+  });
+
+  document.querySelectorAll('[data-decline]').forEach((button) => {
+    button.onclick = async () => {
+      button.disabled = true;
+      try { await db.removeRequest(button.dataset.decline); await reload(); toast('Request declined.'); }
+      catch (error) { toast(error.message); button.disabled = false; }
+    };
+  });
+
+  document.querySelectorAll('[data-level]').forEach((select) => {
+    select.onchange = async () => {
+      try { await db.setAccessLevel(select.dataset.level, select.value); await reload(); toast('Access level updated.'); }
+      catch (error) { toast(error.message); await reload(); }
+    };
+  });
+
+  document.querySelectorAll('[data-role-slot]').forEach((chip) => {
+    chip.onclick = async () => {
+      const { roleMember: memberId, roleSlot: slot } = chip.dataset;
+      const held = chip.classList.contains('on');
+      try {
+        if (held) await db.revokeRole(memberId, slot); else await db.grantRole(memberId, slot);
+        await reload();
+      } catch (error) { toast(error.message); }
+    };
+  });
 }
 
 // --- task editing --------------------------------------------------------
@@ -357,11 +471,7 @@ function bindEvents() {
   });
   $('importBrand').innerHTML = brandOptions();
   $('authForm').onsubmit = submitGate;
-  $('authSecondary').onclick = () => {
-    if (authMode === 'signin') return showGate('signup');
-    if (authMode === 'signup') return showGate('signin');
-    return signOut();
-  };
+  $('authSecondary').onclick = () => showGate(authMode === 'signin' ? 'signup' : 'signin');
   $('signOut').onclick = signOut;
   $('uploadButton').onclick = () => $('importDialog').showModal();
   $('addTaskButton').onclick = newTask;

@@ -64,6 +64,28 @@ test('settings lists access levels and roles', () => {
   assert.match(nodes.get('settingsPanel').innerHTML, /Nobody is waiting for approval/);
 });
 
+test('the membership panel offers every grantable role', () => {
+  const panel = nodes.get('settingsPanel').innerHTML;
+  // The eight workflow stages plus Bookkeeping, which is real work but not a
+  // content stage.
+  for (const slot of ['Strategy', 'Creative', 'Content Lead', 'Approval Coordinator', 'Production', 'Video Editor', 'Paid Media Owner', 'Community Manager', 'Bookkeeping']) {
+    assert.ok(panel.includes(`data-role-slot="${slot}"`), `${slot} chip missing`);
+  }
+  assert.match(panel, /data-level=/, 'access level control missing');
+});
+
+test('a role already held renders as granted', () => {
+  const panel = nodes.get('settingsPanel').innerHTML;
+  const sian = panel.split('Sian Touzel')[1] || '';
+  assert.match(sian.slice(0, 1400), /class="role-chip on" data-role-member="[^"]+" data-role-slot="Community Manager"/);
+});
+
+test('nobody can change their own access level', () => {
+  // Demo mode signs in as Elvis, so his own control must be disabled.
+  const row = nodes.get('settingsPanel').innerHTML.split('Elvis Falcao')[1] || '';
+  assert.match(row.slice(0, 400), /data-level="[^"]+" disabled/);
+});
+
 test('the example campaign generates a full post, boost and report set', () => {
   nodes.get('seedDemo').onclick();
   const table = nodes.get('taskTable').innerHTML;

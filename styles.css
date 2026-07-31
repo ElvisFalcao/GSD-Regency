@@ -20,3 +20,25 @@
 .whoami span{color:#1d3540;font:700 12px 'DM Sans',sans-serif}
 .whoami small{color:#7f969e;font-size:10px}
 .linklike{padding:0;border:0;background:none;color:#208197;font:600 10px 'DM Sans',sans-serif;text-decoration:underline;cursor:pointer}
+
+/* Welcome view for people who have registered but are not yet linked */
+.welcome{display:flex;flex-direction:column;gap:22px;padding:6px 0}
+.welcome-lead{padding:24px 26px;border-radius:16px;background:linear-gradient(120deg,#17849a,#65b8c0);color:#fff}
+.welcome-lead h2{margin:0 0 8px;color:#fff}
+.welcome-lead p{margin:0;max-width:60ch;opacity:.9;font-size:13px;line-height:1.55}
+.welcome-status{display:inline-flex;align-items:center;gap:8px;margin-top:16px;padding:8px 14px;border-radius:11px;background:rgba(255,255,255,.16);font:700 11px 'DM Sans',sans-serif}
+.brand-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:13px}
+.brand-tile{padding:17px 18px;border:1px solid #e7eeee;border-radius:14px;background:#fff;box-shadow:0 14px 34px rgba(47,86,99,.08)}
+.brand-tile h3{margin:6px 0 4px;font:700 17px 'Fraunces',serif;color:#1d3540}
+.brand-tile p{margin:0;color:#7f969e;font-size:11px;line-height:1.45}
+
+/* Membership administration */
+.admin-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:11px 0;border-bottom:1px solid #edf2f1}
+.admin-row:last-child{border-bottom:0}
+.admin-row b{min-width:150px;color:#1d3540;font-size:12px}
+.admin-row small{color:#7f969e;font-size:11px}
+.admin-row select{padding:6px 8px;font-size:11px}
+.admin-row .primary,.admin-row .secondary{padding:6px 11px;font-size:11px;border:0;cursor:pointer}
+.role-chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:5px}
+.role-chip{padding:4px 9px;border:1px solid #dfeaea;border-radius:20px;background:#f5f9f8;color:#7f969e;font:600 10px 'DM Sans',sans-serif;cursor:pointer}
+.role-chip.on{border-color:#79c6ce;background:#cdebed;color:#1d3540}
