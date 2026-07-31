@@ -4,16 +4,17 @@ Internal operations workspace for Regency’s Shalina Healthcare work. It turns 
 
 ## Run locally
 
-Do not double-click `index.html`; browsers block its JavaScript module from a `file://` page. Start the included local server, then open `http://localhost:4173`:
+Requires Node.js — nothing else. Do not double-click `index.html`; browsers refuse ES module imports from a `file://` page, so the app needs a real origin.
 
 ```powershell
 ./start-project-manager.bat
 ```
 
-The interface works in local demo mode without credentials. To persist shared data, populate `config.js` with the existing FluxPlanner Supabase URL and publishable/anon key.
+Then open `http://localhost:4173`. To use a different port: `node dev-server.mjs 4174`.
+
+`config.js` carries the public Supabase URL and publishable key, so the app connects to the shared workspace and asks you to sign in. Blank either value to fall back to local demo mode, which needs no credentials and stores nothing.
 
 ```powershell
-npx serve .
 npm test
 ```
 
