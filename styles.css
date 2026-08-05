@@ -112,3 +112,5 @@
 .plan-table tbody tr{cursor:pointer}
 .plan-table tbody tr:hover{background:#f4faf9}
 .plan-table tfoot td{padding:10px;border-top:2px solid #e7eeee;color:#1d3540}
+.danger{color:#b64040;border-color:#e7c1c1}
+.danger:hover{background:#fdf2f2}

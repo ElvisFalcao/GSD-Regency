@@ -438,11 +438,27 @@ function openCampaign(id) {
     <thead><tr><th>Date</th><th>Activation</th><th>Asset</th><th>Platform</th><th>Objective</th><th>Days</th>${moneyHead}<th>Status</th></tr></thead>
     <tbody>${rows}</tbody>
     <tfoot><tr><td colspan="6"><b>${placements.length} placements</b></td>${moneyFoot}<td></td></tr></tfoot>
-  </table></div><p class="quiet-note">Click a row to open its boost task. The Posts view shows the same plan as a pipeline.</p>`;
+  </table></div><p class="quiet-note">Click a row to open its boost task. The Posts view shows the same plan as a pipeline.</p>${can.isManager ? '<menu><button type="button" id="deleteCampaign" class="secondary danger">Delete campaign and all its tasks</button></menu>' : ''}`;
 
   document.querySelectorAll('#campaignDialogBody [data-task-id]').forEach((el) => {
     el.onclick = () => { $('campaignDialog').close(); openTask(el.dataset.taskId); };
   });
+  const remove = $('deleteCampaign');
+  if (remove) {
+    remove.onclick = guard(async () => {
+      const count = state.tasks.filter((t) => t.campaignId === id).length;
+      if (!window.confirm(`Delete "${campaign.name}" and its ${count} tasks? This cannot be undone. The FluxPlanner plan it came from is not touched.`)) return;
+      remove.disabled = true;
+      try {
+        if (db) await db.deleteCampaign(id);
+        state.campaigns = state.campaigns.filter((c) => c.id !== id);
+        state.tasks = state.tasks.filter((t) => t.campaignId !== id);
+        if (!db) persistDemo();
+        $('campaignDialog').close();
+        render(); toast(`"${campaign.name}" deleted.`);
+      } finally { remove.disabled = false; }
+    });
+  }
   $('campaignDialog').showModal();
 }
 
@@ -630,6 +646,7 @@ function renderTaskDialog(isNew) {
     <label>Live post / supporting link<input id="editLink" type="url" value="${escape(activeTask.liveLink || '')}" placeholder="https://" ${locked && !mine ? 'disabled' : ''} /></label>
     <label>Notes / results<textarea id="editResults" placeholder="Brief, context, results or next action…" ${locked && !mine ? 'disabled' : ''}>${escape(activeTask.notes || '')}</textarea></label>
   </div>${locked ? `<p class="quiet">${mine ? 'You can update status, links and notes on your own task. Reassigning and rescheduling is done by Shane, Elvis or Zaida.' : 'This task belongs to someone else, so it is read-only for you.'}</p>` : ''}`;
+  $('deleteTask').classList.toggle('hidden', isNew || !can.isManager);
   $('taskDialog').showModal();
 }
 
@@ -852,6 +869,15 @@ function bindEvents() {
   $('confirmImport').onclick = guard((event) => { event.preventDefault(); return importRows(); }, importError);
   $('seedDemo').onclick = guard(loadDemo);
   $('saveTask').onclick = guard(async (event) => { event.preventDefault(); if (await saveTask()) $('taskDialog').close(); });
+  $('deleteTask').onclick = guard(async () => {
+    if (!activeTask?.id || !can.isManager) return;
+    if (!window.confirm(`Delete "${activeTask.title}"? This cannot be undone.`)) return;
+    if (db) await db.deleteTask(activeTask.id);
+    state.tasks = state.tasks.filter((t) => t.id !== activeTask.id);
+    if (!db) persistDemo();
+    $('taskDialog').close();
+    render(); toast('Task deleted.');
+  });
   $('notifications').onclick = (event) => { event.stopPropagation(); $('notifPanel').classList.toggle('hidden'); };
   document.addEventListener('click', (event) => {
     if (!$('notifPanel').classList.contains('hidden') && !event.target.closest('.notif-wrap')) $('notifPanel').classList.add('hidden');
