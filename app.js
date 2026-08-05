@@ -24,6 +24,12 @@ const DEMO_MEMBERS = [
 // which is real work (Nikki reconciles spend) but not a content stage.
 const ROLE_SLOTS = [...new Set([...WORKFLOW_TEMPLATE.map((s) => s.role), 'Bookkeeping'])].sort();
 
+// Task types the team actually does. Post/Boost/Report/Content keep their
+// pipeline meaning; the rest are labels, and "Custom…" lets a manager name
+// anything the list forgot — the database accepts any reasonable label.
+const TASK_TYPES = ['To-do', 'Post', 'Boost', 'Report', 'Content', 'Video', 'Image', 'Copy', 'Research', 'Schedule', 'Presentation', 'Comms'];
+const CUSTOM_TYPE = '__custom';
+
 let state = { members: [], campaigns: [], tasks: [], member: null };
 let can = capabilities(null);
 let preview = [];
@@ -334,8 +340,11 @@ function bindTaskCards() { document.querySelectorAll('[data-task-id]').forEach((
 
 function renderTasks() {
   const fill = (id, values) => { const el = $(id); const chosen = el.value; el.innerHTML = `<option value="">${el.options[0]?.text || 'All'}</option>${[...new Set(values)].filter(Boolean).sort().map((v) => `<option ${v === chosen ? 'selected' : ''}>${escape(v)}</option>`).join('')}`; };
-  fill('brandFilter', state.campaigns.map((c) => c.brand)); fill('marketFilter', state.tasks.map((t) => t.market));
+  // The brand list is the catalog, not just brands with campaigns — an empty
+  // workspace otherwise reads as "the brands are gone".
+  fill('brandFilter', Object.keys(BRAND_CATALOG)); fill('marketFilter', state.tasks.map((t) => t.market));
   fill('platformFilter', PLATFORM_IDS); fill('assigneeFilter', state.members.map((m) => m.name));
+  fill('typeFilter', [...TASK_TYPES, ...state.tasks.map((t) => t.type)]);
   const query = $('taskSearch').value.toLowerCase();
   const filters = { brand: $('brandFilter').value, market: $('marketFilter').value, platform: $('platformFilter').value, assignee: $('assigneeFilter').value, type: $('typeFilter').value, status: $('statusFilter').value, assignment: $('assignmentFilter').value };
   const tasks = state.tasks.filter((t) => (!query || t.title.toLowerCase().includes(query))
@@ -400,7 +409,7 @@ function renderCampaigns() {
   $('campaignList').innerHTML = state.campaigns.map((c) => {
     const tasks = state.tasks.filter((t) => t.campaignId === c.id);
     return `<article class="campaign" data-campaign-open="${c.id}"><p class="eyebrow">${escape(c.division || BRAND_CATALOG[c.brand]?.division || '')} · ${escape(c.market)}</p><h3>${escape(c.name)}</h3><p>${escape(c.brand)} · ${tasks.length} generated operational tasks</p><div class="meta"><span>FluxPlanner: ${c.fluxPlanId ? 'linked' : 'spreadsheet import'}</span><span>${tasks.filter((t) => t.status === 'Done').length}/${tasks.length} done · view plan →</span></div></article>`;
-  }).join('') || '<p>No campaigns have been imported yet.</p>';
+  }).join('') || '<p class="empty-state">No campaigns have been imported yet.</p>';
   document.querySelectorAll('[data-campaign-open]').forEach((el) => { el.onclick = () => openCampaign(el.dataset.campaignOpen); });
 }
 
@@ -470,7 +479,7 @@ function renderReports() {
     const f = taskStatus(t);
     const money = t.budget === undefined ? '' : ` · Budget ${t.budget}`;
     return `<article class="task-card" data-task-id="${t.id}"><div class="task-mark Report"></div><div><h3>${escape(t.title)}</h3><p>${escape(t.objective || 'Objective not set')}${money} · ${escape(t.reportState || 'Awaiting data')}</p></div><div class="due ${f.reportDue ? 'overdue' : ''}">${f.reportDue ? 'Due · ' : ''}${escape(t.dueDate)}</div></article>`;
-  }).join('') || '<p>No reporting tasks yet.</p>';
+  }).join('') || '<p class="empty-state">No reporting tasks yet.</p>';
   bindTaskCards();
 }
 
@@ -483,7 +492,7 @@ function money(value, symbol = '$') { return `${symbol}${(Number(value) || 0).to
 function spendRows() { return state.tasks.filter((t) => t.type === 'Boost' && t.budget !== undefined); }
 
 function renderSpend() {
-  if (!can.canSeeBudget) { $('spendTotals').innerHTML = ''; $('spendTable').innerHTML = '<p>You do not have access to budget figures.</p>'; $('spendEntry').innerHTML = ''; return; }
+  if (!can.canSeeBudget) { $('spendTotals').innerHTML = ''; $('spendTable').innerHTML = '<p class="empty-state">You do not have access to budget figures.</p>'; $('spendEntry').innerHTML = ''; return; }
   const rows = spendRows();
   const planned = rows.reduce((sum, t) => sum + (t.budget || 0), 0);
   const actual = rows.reduce((sum, t) => sum + (t.actualSpend || 0), 0);
@@ -515,14 +524,14 @@ function renderSpend() {
   $('spendTable').innerHTML = ordered.length ? `<table><thead><tr><th>${escape(key)}</th><th>Placements</th><th>Planned</th><th>Actual</th><th>Difference</th><th>Rand value</th></tr></thead><tbody>${ordered.map((g) => {
     const diff = g.actual - (g.reported ? g.planned * (g.reported / g.count) : 0);
     return `<tr><td><b>${escape(g.name)}</b></td><td>${g.reported}/${g.count} reported</td><td>${escape(money(g.planned))}</td><td>${escape(money(g.actual))}</td><td class="${g.reported && diff > 0 ? 'due overdue' : ''}">${g.reported ? escape(`${diff >= 0 ? '+' : '−'}${money(Math.abs(diff))}`) : '—'}</td><td>${escape(money(g.rand, 'R'))}</td></tr>`;
-  }).join('')}</tbody></table>` : '<p>No paid placements yet. Import a budget plan to populate this.</p>';
+  }).join('')}</tbody></table>` : '<p class="empty-state">No paid placements yet. Import a budget plan to populate this.</p>';
 
   const outstanding = rows.filter((t) => !t.actualSpend && t.dueDate <= today()).sort((a, b) => a.dueDate.localeCompare(b.dueDate));
   $('spendEntry').innerHTML = outstanding.length ? outstanding.slice(0, 25).map((t) => `<article class="task-card spend-row">
       <div class="task-mark Boost"></div>
       <div><h3>${escape(t.title)}</h3><p>${escape([campaignName(t.campaignId), t.market].filter(Boolean).join(' · '))} · planned ${escape(money(t.budget))}${t.randValue ? ` · ${escape(money(t.randValue, 'R'))}` : ''} · ran ${escape(t.dueDate)}</p></div>
       <div class="spend-input"><input type="number" step="0.01" min="0" placeholder="actual" data-spend-for="${t.id}" /><button class="secondary" data-spend-save="${t.id}" type="button">Save</button></div>
-    </article>`).join('') : '<p>Every placement that has run has a spend figure recorded.</p>';
+    </article>`).join('') : '<p class="empty-state">Every placement that has run has a spend figure recorded.</p>';
 
   document.querySelectorAll('[data-spend-save]').forEach((button) => {
     button.onclick = guard(async () => {
@@ -567,7 +576,7 @@ function renderSettings() {
       <select data-level="${m.id}" ${isSelf || (m.accessLevel === 'owner' && !can.isOwner) ? 'disabled' : ''}>
         ${levels.map((l) => `<option value="${l}" ${l === m.accessLevel ? 'selected' : ''}>${l}</option>`).join('')}
       </select>
-      <div class="role-chips">${ROLE_SLOTS.map((slot) => `<span class="role-chip ${m.roles?.includes(slot) ? 'on' : ''}" data-role-member="${m.id}" data-role-slot="${escape(slot)}" role="button" tabindex="0">${escape(slot)}</span>`).join('')}</div>
+      <div class="role-chips">${ROLE_SLOTS.map((slot) => `<button type="button" class="role-chip ${m.roles?.includes(slot) ? 'on' : ''}" data-role-member="${m.id}" data-role-slot="${escape(slot)}">${escape(slot)}</button>`).join('')}</div>
     </div>`;
   }).join('');
 
@@ -638,15 +647,16 @@ function renderTaskDialog(isNew) {
   $('taskDialogTitle').textContent = isNew ? 'Create and delegate a task' : activeTask.title;
   $('taskDialogBody').innerHTML = `<div class="task-fields">
     <label>Task title<input id="editTitle" value="${escape(activeTask.title || '')}" placeholder="What needs to be done?" ${locked ? 'disabled' : ''} /></label>
-    <label>Task type<select id="editType" ${locked ? 'disabled' : ''}>${['To-do', 'Post', 'Boost', 'Report'].map((type) => `<option ${type === activeTask.type ? 'selected' : ''}>${type}</option>`).join('')}</select></label>
+    <label>Task type<select id="editType" ${locked ? 'disabled' : ''}>${[...new Set([...TASK_TYPES, ...(activeTask.type && !TASK_TYPES.includes(activeTask.type) ? [activeTask.type] : [])])].map((type) => `<option ${type === activeTask.type ? 'selected' : ''}>${escape(type)}</option>`).join('')}<option value="${CUSTOM_TYPE}">Custom…</option></select><input id="editTypeCustom" class="hidden" maxlength="40" placeholder="Name the task type, e.g. Voice-over" /></label>
     <label>Campaign<select id="editCampaign" ${locked ? 'disabled' : ''}>${campaignOptions(activeTask.campaignId)}</select></label>
     <label>Assign to<select id="editAssignee" ${locked ? 'disabled' : ''}>${memberOptions(activeTask.assigneeId)}</select></label>
     <label>Status<select id="editStatus" ${locked && !mine ? 'disabled' : ''}>${['Not started', 'In progress', 'Blocked', 'Done'].map((s) => `<option ${s === activeTask.status ? 'selected' : ''}>${s}</option>`).join('')}</select></label>
     <label>Due date<input id="editDue" type="date" value="${activeTask.dueDate}" ${locked ? 'disabled' : ''} /></label>
     <label>Live post / supporting link<input id="editLink" type="url" value="${escape(activeTask.liveLink || '')}" placeholder="https://" ${locked && !mine ? 'disabled' : ''} /></label>
     <label>Notes / results<textarea id="editResults" placeholder="Brief, context, results or next action…" ${locked && !mine ? 'disabled' : ''}>${escape(activeTask.notes || '')}</textarea></label>
-  </div>${locked ? `<p class="quiet">${mine ? 'You can update status, links and notes on your own task. Reassigning and rescheduling is done by Shane, Elvis or Zaida.' : 'This task belongs to someone else, so it is read-only for you.'}</p>` : ''}`;
+  </div>${locked ? `<p class="quiet-note">${mine ? 'You can update status, links and notes on your own task. Reassigning and rescheduling is done by Shane, Elvis or Zaida.' : 'This task belongs to someone else, so it is read-only for you.'}</p>` : ''}`;
   $('deleteTask').classList.toggle('hidden', isNew || !can.isManager);
+  $('editType').onchange = () => $('editTypeCustom').classList.toggle('hidden', $('editType').value !== CUSTOM_TYPE);
   $('taskDialog').showModal();
 }
 
@@ -659,7 +669,12 @@ async function saveTask() {
     results: activeTask.results, activationKey: activeTask.activationKey
   };
   if (can.isManager) {
-    patch.type = $('editType').value; patch.campaignId = $('editCampaign').value;
+    patch.type = $('editType').value;
+    if (patch.type === CUSTOM_TYPE) {
+      patch.type = $('editTypeCustom').value.trim();
+      if (!patch.type) { toast('Name the custom task type before saving.'); return false; }
+    }
+    patch.campaignId = $('editCampaign').value;
     patch.assigneeId = $('editAssignee').value; patch.dueDate = $('editDue').value;
     // A manager opening and saving a pre-assigned task IS the review — the
     // routing has been looked at by a person, so it stops being a proposal.
