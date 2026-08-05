@@ -61,7 +61,18 @@ async function boot() {
   await refresh();
 }
 
-async function refresh() {
+// The initial load and the sign-in auth event both call refresh at startup.
+// Run concurrently, one can render the welcome screen (which hides every
+// view) while the other restores the nav — leaving a blank shell titled
+// "Welcome to Regency" with nothing visible. Serialising them ends the race;
+// applyCapabilities also re-shows the overview if no view survived.
+let refreshInFlight = null;
+function refresh() {
+  if (!refreshInFlight) refreshInFlight = doRefresh().finally(() => { refreshInFlight = null; });
+  return refreshInFlight;
+}
+
+async function doRefresh() {
   if (recovering) return showGate('recover');
   const { data: { session } } = await client.auth.getSession();
   if (!session) return showGate('signin');
@@ -248,6 +259,14 @@ function applyCapabilities() {
   // renderWelcome hides every nav item; an active member gets them back.
   document.querySelectorAll('.nav').forEach((n) => n.classList.remove('hidden'));
   $('welcomeView').classList.add('hidden');
+  // If the welcome screen hid every view and nothing re-showed one, land on
+  // the overview instead of a blank shell.
+  const views = [...document.querySelectorAll('.view')];
+  if (views.length && views.every((v) => v.classList.contains('hidden'))) {
+    $('overviewView').classList.remove('hidden');
+    $('pageTitle').textContent = 'Today’s operations';
+    document.querySelectorAll('.nav').forEach((n) => n.classList.toggle('active', n.dataset.view === 'overview'));
+  }
   $('whoami').classList.toggle('hidden', !state.member);
   if (state.member) {
     $('whoamiName').textContent = state.member.name;
@@ -380,8 +399,51 @@ function renderPosts() {
 function renderCampaigns() {
   $('campaignList').innerHTML = state.campaigns.map((c) => {
     const tasks = state.tasks.filter((t) => t.campaignId === c.id);
-    return `<article class="campaign"><p class="eyebrow">${escape(c.division || BRAND_CATALOG[c.brand]?.division || '')} · ${escape(c.market)}</p><h3>${escape(c.name)}</h3><p>${escape(c.brand)} · ${tasks.length} generated operational tasks</p><div class="meta"><span>FluxPlanner: ${c.fluxPlanId ? 'linked' : 'spreadsheet import'}</span><span>${tasks.filter((t) => t.status === 'Done').length}/${tasks.length} done</span></div></article>`;
+    return `<article class="campaign" data-campaign-open="${c.id}"><p class="eyebrow">${escape(c.division || BRAND_CATALOG[c.brand]?.division || '')} · ${escape(c.market)}</p><h3>${escape(c.name)}</h3><p>${escape(c.brand)} · ${tasks.length} generated operational tasks</p><div class="meta"><span>FluxPlanner: ${c.fluxPlanId ? 'linked' : 'spreadsheet import'}</span><span>${tasks.filter((t) => t.status === 'Done').length}/${tasks.length} done · view plan →</span></div></article>`;
   }).join('') || '<p>No campaigns have been imported yet.</p>';
+  document.querySelectorAll('[data-campaign-open]').forEach((el) => { el.onclick = () => openCampaign(el.dataset.campaignOpen); });
+}
+
+// The plan behind a campaign, rebuilt from its own tasks rather than read
+// from FluxPlanner — so it renders identically for spreadsheet imports and
+// keeps working if the source plan is later unpublished. Budget columns
+// appear only for readers who receive the figures at all.
+function openCampaign(id) {
+  const campaign = state.campaigns.find((c) => c.id === id);
+  if (!campaign) return;
+  const placements = buildPostPipeline(state.tasks, today()).filter((p) => p.campaignId === id);
+  $('campaignDialogEyebrow').textContent = [campaign.division, campaign.market, campaign.fluxPlanId ? 'FluxPlanner plan' : 'Spreadsheet import'].filter(Boolean).join(' · ').toUpperCase();
+  $('campaignDialogTitle').textContent = campaign.name;
+
+  if (!placements.length) {
+    $('campaignDialogBody').innerHTML = '<p class="quiet-note">No planned posts in this campaign.</p>';
+    $('campaignDialog').showModal();
+    return;
+  }
+
+  const showMoney = can.canSeeBudget;
+  let totalBudget = 0; let totalRand = 0;
+  const rows = placements.map((p) => {
+    const task = p.stages.boost || p.stages.post || p.stages.report;
+    const assetType = p.stages.content ? (p.stages.content.activationKey.split(':content:')[1] || '') : '';
+    const budget = p.stages.boost?.budget; const rand = p.stages.boost?.randValue;
+    if (budget) totalBudget += budget; if (rand) totalRand += rand;
+    const moneyCells = showMoney ? `<td>${budget !== undefined ? escape(money(budget)) : '—'}</td><td>${rand ? escape(money(rand, 'R')) : '—'}</td>` : '';
+    return `<tr data-task-id="${task.id}"><td>${escape(p.date)}</td><td><b>${escape(p.activation)}</b></td><td>${escape(assetType)}</td><td>${escape(p.platform)}</td><td>${escape(task.objective || '')}</td><td>${task.durationDays || '—'}</td>${moneyCells}<td class="${p.overdue ? 'due overdue' : ''}">${escape(p.current === 'complete' ? 'Complete' : CURRENT_LABELS[p.current])}</td></tr>`;
+  }).join('');
+  const moneyHead = showMoney ? '<th>Budget</th><th>Rand</th>' : '';
+  const moneyFoot = showMoney ? `<td><b>${escape(money(totalBudget))}</b></td><td><b>${escape(money(totalRand, 'R'))}</b></td>` : '';
+
+  $('campaignDialogBody').innerHTML = `<div class="table-wrap plan-table"><table>
+    <thead><tr><th>Date</th><th>Activation</th><th>Asset</th><th>Platform</th><th>Objective</th><th>Days</th>${moneyHead}<th>Status</th></tr></thead>
+    <tbody>${rows}</tbody>
+    <tfoot><tr><td colspan="6"><b>${placements.length} placements</b></td>${moneyFoot}<td></td></tr></tfoot>
+  </table></div><p class="quiet-note">Click a row to open its boost task. The Posts view shows the same plan as a pipeline.</p>`;
+
+  document.querySelectorAll('#campaignDialogBody [data-task-id]').forEach((el) => {
+    el.onclick = () => { $('campaignDialog').close(); openTask(el.dataset.taskId); };
+  });
+  $('campaignDialog').showModal();
 }
 
 // Budget arrives only for readers holding the Bookkeeping capability. For

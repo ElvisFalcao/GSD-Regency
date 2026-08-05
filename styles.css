@@ -97,3 +97,14 @@
 .pipe-state.overdue{color:#a63a39;font-weight:700}
 .pipe-state.done{color:#1e7d4f;font-weight:700}
 .quiet-note{color:#7f969e;font-size:13px}
+
+/* Campaign plan dialog */
+.modal-wide{width:min(880px,94vw);max-width:880px}
+.campaign{cursor:pointer}
+.plan-table{max-height:52vh;overflow:auto;margin-top:6px}
+.plan-table table{width:100%;font-size:12px}
+.plan-table th{position:sticky;top:0;background:#fff;text-align:left;padding:8px 10px;color:#7f969e;font:700 10px 'DM Sans',sans-serif;letter-spacing:.4px;border-bottom:1px solid #edf2f1}
+.plan-table td{padding:8px 10px;border-bottom:1px solid #f2f6f5;color:#1d3540}
+.plan-table tbody tr{cursor:pointer}
+.plan-table tbody tr:hover{background:#f4faf9}
+.plan-table tfoot td{padding:10px;border-top:2px solid #e7eeee;color:#1d3540}
