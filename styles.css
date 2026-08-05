@@ -98,8 +98,12 @@
 .pipe-state.done{color:#1e7d4f;font-weight:700}
 .quiet-note{color:#7f969e;font-size:13px}
 
-/* Campaign plan dialog */
-.modal-wide{width:min(880px,94vw);max-width:880px}
+/* Campaign plan dialog. The base stylesheet caps every dialog at 620px, so
+   the wide form overflowed inside it and the whole dialog scrolled sideways —
+   the dialog element itself must be widened, not just the form within. */
+#campaignDialog{width:min(960px,calc(100% - 26px));max-width:none}
+.modal-wide{width:100%}
+.plan-table td:nth-child(2),.plan-table td:nth-child(5){white-space:normal}
 .campaign{cursor:pointer}
 .plan-table{max-height:52vh;overflow:auto;margin-top:6px}
 .plan-table table{width:100%;font-size:12px}
