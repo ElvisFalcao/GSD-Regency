@@ -52,3 +52,10 @@
 .badge.proposed{background:#f7d1c1;color:#8a4a2c}
 .task-mark.Content{background:#8fbf6b}
 .badge.Content{background:#e3f0d6;color:#4a6b33}
+
+/* Spend */
+.spend-row{align-items:center}
+.spend-input{display:flex;gap:6px;align-items:center}
+.spend-input input{width:110px;padding:7px 9px;border:1px solid #dfeaea;border-radius:9px;font-size:12px}
+.spend-input button{padding:7px 12px;border:0;font-size:11px;cursor:pointer}
+#spendGroup{padding:7px 10px;border:1px solid #dfeaea;border-radius:9px;font-size:11px}

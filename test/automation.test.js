@@ -90,5 +90,5 @@ test('maps FluxPlanner budget-plan headings and ignores subtotal rows', () => {
     { DATE: '24/07/2026', ACTIVATION: 'Teaser', 'ASSET TYPE': 'Video', PLATFORM: 'Instagram', Country: 'Nigeria', DURATION: 5, OBJECTIVE: 'Engagement', BUDGET: 75, COMPLETE: false },
     { BUDGET: 300 }
   ]);
-  assert.deepEqual(rows, [{ date: '2026-07-24', activation: 'Teaser', assetType: 'Video', platform: 'Instagram', market: 'Nigeria', durationDays: 5, objective: 'Engagement', budget: 75, actualSpend: 0, complete: false }]);
+  assert.deepEqual(rows, [{ date: '2026-07-24', activation: 'Teaser', assetType: 'Video', platform: 'Instagram', market: 'Nigeria', durationDays: 5, objective: 'Engagement', budget: 75, actualSpend: 0, randValue: 0, complete: false }]);
 });

@@ -175,7 +175,7 @@ function persistDemo() { localStorage.setItem(DEMO_KEY, JSON.stringify({ campaig
 
 function render() {
   applyCapabilities();
-  renderOverview(); renderTasks(); renderCampaigns(); renderReports(); renderSettings();
+  renderOverview(); renderTasks(); renderCampaigns(); renderSpend(); renderReports(); renderSettings();
   $('notificationCount').textContent = state.tasks.filter((t) => { const f = taskStatus(t); return f.overdue || f.boostToday || f.reportDue; }).length;
 }
 
@@ -194,6 +194,7 @@ function applyCapabilities() {
   $('addTaskButton').classList.toggle('hidden', !can.isManager);
   $('uploadButton').classList.toggle('hidden', !can.isManager);
   $('seedDemo').classList.toggle('hidden', configured);
+  document.querySelector('[data-view="spend"]').classList.toggle('hidden', !can.canSeeBudget);
   document.querySelector('[data-view="reports"]').classList.toggle('hidden', !can.canSeeAnalytics);
   document.querySelector('[data-view="settings"]').classList.toggle('hidden', !can.isManager);
 }
@@ -276,6 +277,72 @@ function renderReports() {
     return `<article class="task-card" data-task-id="${t.id}"><div class="task-mark Report"></div><div><h3>${escape(t.title)}</h3><p>${escape(t.objective || 'Objective not set')}${money} · ${escape(t.reportState || 'Awaiting data')}</p></div><div class="due ${f.reportDue ? 'overdue' : ''}">${f.reportDue ? 'Due · ' : ''}${escape(t.dueDate)}</div></article>`;
   }).join('') || '<p>No reporting tasks yet.</p>';
   bindTaskCards();
+}
+
+// --- spend ---------------------------------------------------------------
+// Money lives on the Boost, which is the paid placement. Post and Report carry
+// none, so they are simply absent here rather than counted as zero.
+
+function money(value, symbol = '$') { return `${symbol}${(Number(value) || 0).toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`; }
+
+function spendRows() { return state.tasks.filter((t) => t.type === 'Boost' && t.budget !== undefined); }
+
+function renderSpend() {
+  if (!can.canSeeBudget) { $('spendTotals').innerHTML = ''; $('spendTable').innerHTML = '<p>You do not have access to budget figures.</p>'; $('spendEntry').innerHTML = ''; return; }
+  const rows = spendRows();
+  const planned = rows.reduce((sum, t) => sum + (t.budget || 0), 0);
+  const actual = rows.reduce((sum, t) => sum + (t.actualSpend || 0), 0);
+  const rand = rows.reduce((sum, t) => sum + (t.randValue || 0), 0);
+  const recorded = rows.filter((t) => t.actualSpend).length;
+  // Variance is only meaningful against placements that have reported. Against
+  // the full plan it just tracks how much of the campaign has run.
+  const reportedPlanned = rows.filter((t) => t.actualSpend).reduce((sum, t) => sum + (t.budget || 0), 0);
+  const variance = actual - reportedPlanned;
+
+  $('spendTotals').innerHTML = [
+    ['Planned', money(planned), `${rows.length} placements`],
+    ['Actual so far', money(actual), `${recorded} of ${rows.length} reported`],
+    ['Variance on reported', `${variance >= 0 ? '+' : '−'}${money(Math.abs(variance))}`, variance > 0 ? 'over what was planned' : variance < 0 ? 'under what was planned' : 'on plan'],
+    ['Plan value in rand', money(rand, 'R'), 'at the plan’s own rate']
+  ].map(([label, value, caption]) => `<article class="stat"><p class="eyebrow">${label}</p><div class="number">${escape(value)}</div><div class="caption">${escape(caption)}</div></article>`).join('');
+
+  const key = $('spendGroup').value || 'campaign';
+  const label = (t) => ({ campaign: campaignName(t.campaignId) || 'No campaign', platform: t.platform || '—', market: t.market || '—', activation: (t.title || '').split(' · ')[0] }[key]);
+  const groups = new Map();
+  for (const task of rows) {
+    const name = label(task);
+    if (!groups.has(name)) groups.set(name, { name, planned: 0, actual: 0, rand: 0, count: 0, reported: 0 });
+    const g = groups.get(name);
+    g.planned += task.budget || 0; g.actual += task.actualSpend || 0; g.rand += task.randValue || 0;
+    g.count += 1; if (task.actualSpend) g.reported += 1;
+  }
+  const ordered = [...groups.values()].sort((a, b) => b.planned - a.planned);
+  $('spendTable').innerHTML = ordered.length ? `<table><thead><tr><th>${escape(key)}</th><th>Placements</th><th>Planned</th><th>Actual</th><th>Difference</th><th>Rand value</th></tr></thead><tbody>${ordered.map((g) => {
+    const diff = g.actual - (g.reported ? g.planned * (g.reported / g.count) : 0);
+    return `<tr><td><b>${escape(g.name)}</b></td><td>${g.reported}/${g.count} reported</td><td>${escape(money(g.planned))}</td><td>${escape(money(g.actual))}</td><td class="${g.reported && diff > 0 ? 'due overdue' : ''}">${g.reported ? escape(`${diff >= 0 ? '+' : '−'}${money(Math.abs(diff))}`) : '—'}</td><td>${escape(money(g.rand, 'R'))}</td></tr>`;
+  }).join('')}</tbody></table>` : '<p>No paid placements yet. Import a budget plan to populate this.</p>';
+
+  const outstanding = rows.filter((t) => !t.actualSpend && t.dueDate <= today()).sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+  $('spendEntry').innerHTML = outstanding.length ? outstanding.slice(0, 25).map((t) => `<article class="task-card spend-row">
+      <div class="task-mark Boost"></div>
+      <div><h3>${escape(t.title)}</h3><p>${escape([campaignName(t.campaignId), t.market].filter(Boolean).join(' · '))} · planned ${escape(money(t.budget))}${t.randValue ? ` · ${escape(money(t.randValue, 'R'))}` : ''} · ran ${escape(t.dueDate)}</p></div>
+      <div class="spend-input"><input type="number" step="0.01" min="0" placeholder="actual" data-spend-for="${t.id}" /><button class="secondary" data-spend-save="${t.id}" type="button">Save</button></div>
+    </article>`).join('') : '<p>Every placement that has run has a spend figure recorded.</p>';
+
+  document.querySelectorAll('[data-spend-save]').forEach((button) => {
+    button.onclick = guard(async () => {
+      const id = button.dataset.spendSave;
+      const input = document.querySelector(`[data-spend-for="${id}"]`);
+      const value = Number(input.value);
+      if (!input.value || Number.isNaN(value) || value < 0) return toast('Enter the amount that was actually spent.');
+      button.disabled = true;
+      const task = state.tasks.find((t) => t.id === id);
+      if (db) await db.setFinancials(id, { actualSpend: value });
+      task.actualSpend = value;
+      if (!db) persistDemo();
+      render(); toast(`Recorded ${money(value)} against ${task.title}.`);
+    });
+  });
 }
 
 function renderSettings() {
@@ -521,7 +588,7 @@ function guard(handler, onError) {
 }
 
 function bindEvents() {
-  const titles = { overview: 'Today’s operations', tasks: 'Task command centre', campaigns: 'Campaigns', reports: 'Reporting queue', settings: 'Workspace settings' };
+  const titles = { overview: 'Today’s operations', tasks: 'Task command centre', campaigns: 'Campaigns', spend: 'Paid media spend', reports: 'Reporting queue', settings: 'Workspace settings' };
   document.querySelectorAll('.nav').forEach((b) => {
     b.onclick = () => {
       document.querySelectorAll('.nav').forEach((n) => n.classList.remove('active'));
@@ -546,6 +613,7 @@ function bindEvents() {
   $('viewAllTasks').onclick = () => document.querySelector('[data-view="tasks"]').click();
   ['taskSearch', 'brandFilter', 'marketFilter', 'platformFilter', 'assigneeFilter', 'typeFilter', 'statusFilter']
     .forEach((id) => $(id).addEventListener(id === 'taskSearch' ? 'input' : 'change', renderTasks));
+  $('spendGroup').addEventListener('change', renderSpend);
 }
 
 // A rejection here would otherwise leave the page blank with nothing but a

@@ -94,6 +94,33 @@ test('other insert failures still surface', async () => {
   await assert.rejects(() => db.requestAccess(), /permission denied/);
 });
 
+test('a budget belongs to the boost alone, not to all three tasks', () => {
+  const steps = planActivationInserts(
+    { activation: 'Teaser', date: '2026-07-24', platform: 'Instagram', market: 'Nigeria', budget: 75, randValue: 1166.25, durationDays: 5 },
+    'c1', 'm1'
+  );
+  // Attaching money to Post, Boost and Report alike reported every plan at
+  // three times its real value.
+  const paid = steps.filter((s) => s.task.type === 'Boost');
+  assert.equal(paid.length, 1);
+  assert.equal(steps.filter((s) => ['Post', 'Report'].includes(s.task.type)).length, 2);
+});
+
+test('setFinancials sends only the fields it was given', async () => {
+  let captured = null;
+  const client = {
+    auth: { getUser: async () => ({ data: { user: { id: 'auth-1', email: 'a@b.c' } } }) },
+    from: () => ({ upsert: async (payload) => { captured = payload; return { error: null }; } })
+  };
+  const db = createDataLayer(client, { workspaceId: 'regency-shalina' });
+  await db.setFinancials('t1', { actualSpend: 240.5 });
+  // An upsert carrying budget: undefined would erase the planned figure every
+  // time someone recorded what was actually spent.
+  assert.equal(captured.actual_spend, 240.5);
+  assert.equal('budget' in captured, false);
+  assert.equal('rand_value' in captured, false);
+});
+
 test('refuses to build without a client or workspace', () => {
   assert.throws(() => createDataLayer(null, { workspaceId: 'regency-shalina' }), /Supabase client/);
   assert.throws(() => createDataLayer({}, {}), /workspaceId/);
