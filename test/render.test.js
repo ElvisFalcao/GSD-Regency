@@ -12,7 +12,7 @@ const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replac
 
 function el(id = '') {
   const node = {
-    id, _text: '', innerHTML: '', value: '', options: [{ text: 'All' }], dataset: {},
+    id, _text: '', innerHTML: '', value: '', options: [{ text: 'All' }], dataset: {}, style: {},
     classList: {
       _s: new Set(), add(c) { this._s.add(c); }, remove(c) { this._s.delete(c); },
       toggle(c, on) { if (on) this._s.add(c); else this._s.delete(c); }, contains(c) { return this._s.has(c); }
@@ -34,6 +34,7 @@ const navs = views.map((v) => { const n = el(); n.dataset.view = v; return n; })
 globalThis.document = {
   getElementById: (id) => { if (!nodes.has(id)) nodes.set(id, el(id)); return nodes.get(id); },
   createElement: () => el(),
+  addEventListener() {},
   querySelector: (sel) => navs.find((n) => sel.includes(n.dataset.view)) || el(),
   querySelectorAll: (sel) => (sel === '.nav' ? navs : sel === '.view' ? [...nodes.values()].filter((n) => n.id.endsWith('View')) : [])
 };

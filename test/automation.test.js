@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { addBusinessDays, createActivationTasks, normaliseRows, validateActivation, findHeaderRow, parseMoney, roleForAssetType, groupContentTasks, subtractBusinessDays, fluxPlanRows } from '../lib/automation.js';
+import { addBusinessDays, createActivationTasks, normaliseRows, validateActivation, findHeaderRow, parseMoney, roleForAssetType, groupContentTasks, subtractBusinessDays, fluxPlanRows, detectBrand } from '../lib/automation.js';
 
 test('maps a published FluxPlanner plan onto the import row shape', () => {
   // Mirrors what FluxPlanner's budget-engine actually writes: DD/MM/YYYY
@@ -24,6 +24,18 @@ test('maps a published FluxPlanner plan onto the import row shape', () => {
   });
   // The mapped rows must satisfy the same eligibility rules as a spreadsheet.
   assert.equal(validateActivation({ ...rows[0], brand: 'Ibucap' }), null);
+});
+
+test('detects the brand a published plan belongs to', () => {
+  // Declared at publish time wins outright.
+  assert.equal(detectBrand('Anything at all', 'Ibucap'), 'Ibucap');
+  // Legacy plans published before the brand existed: read the name, but only
+  // when it names exactly one brand.
+  assert.equal(detectBrand('Test Germol', ''), 'Germol');
+  assert.equal(detectBrand("Shal'Artem Bounce Back", ''), "Shal'Artem");
+  assert.equal(detectBrand('Q3 Awareness Push', ''), null);
+  assert.equal(detectBrand('Germol x Flodent combo', ''), null);
+  assert.equal(detectBrand('', 'NotARealBrand'), null);
 });
 
 test('an empty or legacy plan maps to no rows rather than throwing', () => {

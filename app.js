@@ -1,4 +1,4 @@
-import { BRAND_CATALOG, PLATFORM_IDS, WORKFLOW_TEMPLATE, normaliseRows, validateActivation, createActivationTasks, taskFlags, findHeaderRow, groupContentTasks } from './lib/automation.js';
+import { BRAND_CATALOG, PLATFORM_IDS, WORKFLOW_TEMPLATE, normaliseRows, validateActivation, createActivationTasks, taskFlags, findHeaderRow, groupContentTasks, detectBrand } from './lib/automation.js';
 import { createDataLayer, capabilities } from './lib/data.js';
 
 const cfg = window.PM_CONFIG || {};
@@ -180,7 +180,31 @@ function persistDemo() { localStorage.setItem(DEMO_KEY, JSON.stringify({ campaig
 function render() {
   applyCapabilities();
   renderOverview(); renderTasks(); renderCampaigns(); renderSpend(); renderReports(); renderSettings();
-  $('notificationCount').textContent = state.tasks.filter((t) => { const f = taskStatus(t); return f.overdue || f.boostToday || f.reportDue; }).length;
+  renderNotifications();
+}
+
+// The bell answers "what needs me right now": overdue work, boosts launching
+// today, reports waiting on results. Clicking an entry opens the task itself.
+function notificationTasks() {
+  return state.tasks
+    .map((t) => ({ t, f: taskStatus(t) }))
+    .filter(({ f }) => f.overdue || f.boostToday || f.reportDue)
+    .sort((a, b) => a.t.dueDate.localeCompare(b.t.dueDate));
+}
+
+function renderNotifications() {
+  const items = notificationTasks();
+  $('notificationCount').textContent = items.length;
+  $('notificationCount').style.display = items.length ? '' : 'none';
+  $('notifPanel').innerHTML = items.length
+    ? items.slice(0, 12).map(({ t, f }) => {
+        const reason = f.overdue ? 'Overdue' : f.boostToday ? 'Boost launches today' : 'Report due';
+        return `<button type="button" class="notif-item" data-notif-task="${t.id}"><b>${escape(t.title)}</b><small>${escape(reason)} · ${escape(t.dueDate)} · ${escape(memberName(t.assigneeId))}</small></button>`;
+      }).join('') + (items.length > 12 ? `<div class="notif-more">…and ${items.length - 12} more in the task list</div>` : '')
+    : '<div class="notif-more">Nothing needs attention right now.</div>';
+  document.querySelectorAll('[data-notif-task]').forEach((el) => {
+    el.onclick = () => { $('notifPanel').classList.add('hidden'); openTask(el.dataset.notifTask); };
+  });
 }
 
 // Hiding a control is a courtesy, not a control. Every rule below is enforced
@@ -216,10 +240,15 @@ function renderOverview() {
   // It sits at the top until a manager agrees to it.
   const proposed = state.tasks.filter((t) => t.assignmentState === 'proposed');
   $('proposalBar').innerHTML = proposed.length && can.isManager
-    ? `<div><b>${proposed.length} pre-assigned tasks</b> were routed from the plan by asset type. Check the owners, then confirm.</div><button id="confirmAll" class="primary" type="button">Confirm all</button>`
+    ? `<div><b>${proposed.length} pre-assigned tasks</b> were routed from the plan by asset type. Review them — editing one confirms it — or confirm the lot.</div><div class="proposal-actions"><button id="reviewProposed" class="secondary" type="button">Review tasks</button><button id="confirmAll" class="primary" type="button">Confirm all</button></div>`
     : '';
   $('proposalBar').classList.toggle('hidden', !proposed.length || !can.isManager);
   if (proposed.length && can.isManager) {
+    $('reviewProposed').onclick = () => {
+      $('assignmentFilter').value = 'proposed';
+      document.querySelector('[data-view="tasks"]').click();
+      renderTasks();
+    };
     $('confirmAll').onclick = guard(async () => {
       if (!db) { proposed.forEach((t) => { t.assignmentState = 'confirmed'; }); persistDemo(); render(); return toast('Assignments confirmed.'); }
       const saved = await db.confirmAssignments(proposed.map((t) => t.id));
@@ -254,13 +283,14 @@ function renderTasks() {
   fill('brandFilter', state.campaigns.map((c) => c.brand)); fill('marketFilter', state.tasks.map((t) => t.market));
   fill('platformFilter', PLATFORM_IDS); fill('assigneeFilter', state.members.map((m) => m.name));
   const query = $('taskSearch').value.toLowerCase();
-  const filters = { brand: $('brandFilter').value, market: $('marketFilter').value, platform: $('platformFilter').value, assignee: $('assigneeFilter').value, type: $('typeFilter').value, status: $('statusFilter').value };
+  const filters = { brand: $('brandFilter').value, market: $('marketFilter').value, platform: $('platformFilter').value, assignee: $('assigneeFilter').value, type: $('typeFilter').value, status: $('statusFilter').value, assignment: $('assignmentFilter').value };
   const tasks = state.tasks.filter((t) => (!query || t.title.toLowerCase().includes(query))
     && (!filters.brand || state.campaigns.find((c) => c.id === t.campaignId)?.brand === filters.brand)
     && (!filters.market || t.market === filters.market) && (!filters.platform || t.platform === filters.platform)
     && (!filters.assignee || memberName(t.assigneeId) === filters.assignee)
-    && (!filters.type || t.type === filters.type) && (!filters.status || t.status === filters.status));
-  $('taskTable').innerHTML = `<table><thead><tr><th>Task</th><th>Campaign / Brand</th><th>Assigned to</th><th>Due</th><th>Status</th></tr></thead><tbody>${tasks.map((t) => `<tr data-task-id="${t.id}"><td><b>${escape(t.title)}</b><br><span class="badge ${t.type}">${t.type || 'To-do'}</span></td><td>${escape(campaignName(t.campaignId))}</td><td>${escape(memberName(t.assigneeId))}</td><td class="${taskStatus(t).overdue ? 'due overdue' : ''}">${escape(t.dueDate)}</td><td>${escape(t.status)}</td></tr>`).join('') || '<tr><td colspan="5">No tasks match these filters.</td></tr>'}</tbody></table>`;
+    && (!filters.type || t.type === filters.type) && (!filters.status || t.status === filters.status)
+    && (!filters.assignment || (t.assignmentState || 'confirmed') === filters.assignment));
+  $('taskTable').innerHTML = `<table><thead><tr><th>Task</th><th>Campaign / Brand</th><th>Assigned to</th><th>Due</th><th>Status</th></tr></thead><tbody>${tasks.map((t) => `<tr data-task-id="${t.id}"><td><b>${escape(t.title)}</b><br><span class="badge ${t.type}">${t.type || 'To-do'}</span>${t.assignmentState === 'proposed' ? ' <span class="badge proposed">pre-assigned</span>' : ''}</td><td>${escape(campaignName(t.campaignId))}</td><td>${escape(memberName(t.assigneeId))}</td><td class="${taskStatus(t).overdue ? 'due overdue' : ''}">${escape(t.dueDate)}</td><td>${escape(t.status)}</td></tr>`).join('') || '<tr><td colspan="5">No tasks match these filters.</td></tr>'}</tbody></table>`;
   bindTaskCards();
 }
 
@@ -443,7 +473,7 @@ function newTask() { activeTask = { title: '', type: 'To-do', campaignId: '', as
 function renderTaskDialog(isNew) {
   const mine = activeTask.assigneeId && activeTask.assigneeId === state.member?.id;
   const locked = !can.isManager;
-  $('taskDialogType').textContent = isNew ? 'NEW TEAM TASK' : `${(activeTask.type || 'To-do').toUpperCase()} · ${campaignName(activeTask.campaignId)}`;
+  $('taskDialogType').textContent = isNew ? 'NEW TEAM TASK' : `${(activeTask.type || 'To-do').toUpperCase()}${activeTask.assignmentState === 'proposed' ? ' · PRE-ASSIGNED — SAVING CONFIRMS IT' : ''} · ${campaignName(activeTask.campaignId)}`;
   $('taskDialogTitle').textContent = isNew ? 'Create and delegate a task' : activeTask.title;
   $('taskDialogBody').innerHTML = `<div class="task-fields">
     <label>Task title<input id="editTitle" value="${escape(activeTask.title || '')}" placeholder="What needs to be done?" ${locked ? 'disabled' : ''} /></label>
@@ -469,6 +499,9 @@ async function saveTask() {
   if (can.isManager) {
     patch.type = $('editType').value; patch.campaignId = $('editCampaign').value;
     patch.assigneeId = $('editAssignee').value; patch.dueDate = $('editDue').value;
+    // A manager opening and saving a pre-assigned task IS the review — the
+    // routing has been looked at by a person, so it stops being a proposal.
+    if (activeTask.assignmentState === 'proposed') patch.assignmentState = 'confirmed';
   } else {
     patch.type = activeTask.type; patch.campaignId = activeTask.campaignId;
     patch.assigneeId = activeTask.assigneeId; patch.dueDate = activeTask.dueDate;
@@ -544,8 +577,12 @@ function selectFluxPlan() {
   if (!plan) { previewSource = null; preview = []; $('importPreview').innerHTML = ''; $('confirmImport').disabled = true; return; }
   previewSource = { type: 'flux', plan };
   $('fileInput').value = '';
+  // The plan knows its brand — declared at publish, or readable from the name
+  // for plans published before that existed. Pre-select it; still overridable.
+  const brand = detectBrand(plan.name, plan.brand);
+  if (brand) $('importBrand').value = brand;
   if (!plan.rows.length) return importError('That plan has no usable rows — it may predate the row format GSD understands.');
-  importError('');
+  importError(brand ? '' : 'Could not tell which brand this plan is for — choose it above.');
   renderImportPreview(plan.rows);
 }
 
@@ -656,7 +693,10 @@ function bindEvents() {
   $('confirmImport').onclick = guard((event) => { event.preventDefault(); return importRows(); }, importError);
   $('seedDemo').onclick = guard(loadDemo);
   $('saveTask').onclick = guard(async (event) => { event.preventDefault(); if (await saveTask()) $('taskDialog').close(); });
-  $('notifications').onclick = () => { document.querySelector('[data-view="overview"]').click(); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+  $('notifications').onclick = (event) => { event.stopPropagation(); $('notifPanel').classList.toggle('hidden'); };
+  document.addEventListener('click', (event) => {
+    if (!$('notifPanel').classList.contains('hidden') && !event.target.closest('.notif-wrap')) $('notifPanel').classList.add('hidden');
+  });
   $('viewAllTasks').onclick = () => document.querySelector('[data-view="tasks"]').click();
   ['taskSearch', 'brandFilter', 'marketFilter', 'platformFilter', 'assigneeFilter', 'typeFilter', 'statusFilter']
     .forEach((id) => $(id).addEventListener(id === 'taskSearch' ? 'input' : 'change', renderTasks));

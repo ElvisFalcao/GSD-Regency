@@ -31,7 +31,7 @@
         <div class="aside-note"><span class="aside-dot"></span>Shalina Healthcare<br /><small>Africa/Johannesburg</small></div>
       </aside>
       <main>
-        <header><div><p class="eyebrow">OPERATIONS DESK</p><h1 id="pageTitle">Today’s operations</h1></div><div class="header-actions"><button id="notifications" class="icon-button" title="Notifications">🔔<b id="notificationCount">0</b></button><button id="addTaskButton" class="secondary">+ Add task</button><button id="uploadButton" class="primary">Import budget plan</button><div id="whoami" class="whoami hidden"><span id="whoamiName"></span><small id="whoamiRole"></small><button id="signOut" class="linklike" type="button">Sign out</button></div></div></header>
+        <header><div><p class="eyebrow">OPERATIONS DESK</p><h1 id="pageTitle">Today’s operations</h1></div><div class="header-actions"><div class="notif-wrap"><button id="notifications" class="icon-button" title="Notifications">🔔<b id="notificationCount">0</b></button><div id="notifPanel" class="notif-panel hidden"></div></div><button id="addTaskButton" class="secondary">+ Add task</button><button id="uploadButton" class="primary">Import budget plan</button><div id="whoami" class="whoami hidden"><span id="whoamiName"></span><small id="whoamiRole"></small><button id="signOut" class="linklike" type="button">Sign out</button></div></div></header>
         <section id="welcomeView" class="view hidden">
           <div id="welcomePanel" class="welcome"></div>
         </section>
@@ -52,6 +52,7 @@
             <select id="assigneeFilter"><option value="">Everyone</option></select>
             <select id="typeFilter"><option value="">All task types</option><option>Post</option><option>Boost</option><option>Report</option></select>
             <select id="statusFilter"><option value="">All statuses</option><option>Not started</option><option>In progress</option><option>Blocked</option><option>Done</option></select>
+            <select id="assignmentFilter"><option value="">All assignments</option><option value="proposed">Pre-assigned</option><option value="confirmed">Confirmed</option></select>
           </div>
           <div id="taskTable" class="table-wrap"></div>
         </section>
@@ -67,7 +68,7 @@
         <section id="settingsView" class="view hidden"><div class="section-heading"><div><p class="eyebrow">WORKSPACE SETTINGS</p><h2>People, automation and channels</h2></div><div id="settingsPanel" class="settings-grid"></div></section>
       </main>
     </div>
-    <dialog id="importDialog"><form method="dialog" class="modal"><button class="close" value="cancel">×</button><p class="eyebrow">SPREADSHEET IMPORT</p><h2>Turn a budget plan into work</h2><p>Choose a Brand, then upload the FluxPlanner Excel export. Subtotals are ignored and each valid row generates a post, boost and report task.</p><label>Brand<select id="importBrand"></select></label><label id="fluxPlanRow" class="hidden">Published FluxPlanner plan<select id="fluxPlanSelect"><option value="">Choose a published plan…</option></select></label><label>Or upload the Excel export (.xlsx)<input id="fileInput" type="file" accept=".xlsx,.xls" /></label><div id="importPreview" class="preview"></div><button id="confirmImport" class="primary" value="default" disabled>Import valid activation rows</button></form></dialog>
+    <dialog id="importDialog"><form method="dialog" class="modal"><button class="close" value="cancel">×</button><p class="eyebrow">SPREADSHEET IMPORT</p><h2>Turn a budget plan into work</h2><p>Pick a published FluxPlanner plan — the brand comes with it — or choose a Brand and upload the Excel export. Each valid row generates a post, boost and report task, plus one asset task per creative.</p><label>Brand<select id="importBrand"></select></label><label id="fluxPlanRow" class="hidden">Published FluxPlanner plan<select id="fluxPlanSelect"><option value="">Choose a published plan…</option></select></label><label>Or upload the Excel export (.xlsx)<input id="fileInput" type="file" accept=".xlsx,.xls" /></label><div id="importPreview" class="preview"></div><button id="confirmImport" class="primary" value="default" disabled>Import valid activation rows</button></form></dialog>
     <dialog id="taskDialog"><form method="dialog" class="modal"><button class="close" value="cancel">×</button><p class="eyebrow" id="taskDialogType"></p><h2 id="taskDialogTitle"></h2><div id="taskDialogBody"></div><menu><button value="cancel" class="secondary">Close</button><button id="saveTask" value="default" class="primary">Save task</button></menu></form></dialog>
     <div id="toast" role="status"></div>
     <div id="authGate" class="auth-gate hidden">
