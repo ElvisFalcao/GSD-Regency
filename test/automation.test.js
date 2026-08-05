@@ -1,6 +1,36 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { addBusinessDays, createActivationTasks, normaliseRows, validateActivation, findHeaderRow, parseMoney, roleForAssetType, groupContentTasks, subtractBusinessDays } from '../lib/automation.js';
+import { addBusinessDays, createActivationTasks, normaliseRows, validateActivation, findHeaderRow, parseMoney, roleForAssetType, groupContentTasks, subtractBusinessDays, fluxPlanRows } from '../lib/automation.js';
+
+test('maps a published FluxPlanner plan onto the import row shape', () => {
+  // Mirrors what FluxPlanner's budget-engine actually writes: DD/MM/YYYY
+  // dates, lowercase platform ids, country as a full name, the rand figure
+  // named zarValue, and _isSubtotal spacer rows between activations.
+  const rows = fluxPlanRows({
+    campaignName: 'IBUCAP Cold & Flu',
+    planData: {
+      rows: [
+        { date: '17/07/2026', day: 'Friday', activation: 'Teaser', assetType: 'Video', platform: 'tiktok', country: 'Nigeria', zarValue: 3511.29, duration: 7, objective: 'Video Views', complete: false, actualSpend: '', budget: 225.81, _activationId: 'act-1' },
+        { date: '17/07/2026', day: 'Friday', activation: 'Teaser', assetType: 'Video', platform: 'instagram', country: 'Nigeria', zarValue: 2340.86, duration: 5, objective: 'Engagement', complete: false, actualSpend: '', budget: 150.54, _activationId: 'act-1' },
+        { _isSubtotal: true, activationId: 'act-1', budget: 376.35 }
+      ]
+    }
+  });
+  assert.equal(rows.length, 2);
+  assert.deepEqual(rows[0], {
+    date: '2026-07-17', activation: 'Teaser', assetType: 'Video', platform: 'TikTok',
+    market: 'Nigeria', durationDays: 7, objective: 'Video Views',
+    budget: 225.81, actualSpend: 0, randValue: 3511.29, complete: false
+  });
+  // The mapped rows must satisfy the same eligibility rules as a spreadsheet.
+  assert.equal(validateActivation({ ...rows[0], brand: 'Ibucap' }), null);
+});
+
+test('an empty or legacy plan maps to no rows rather than throwing', () => {
+  assert.deepEqual(fluxPlanRows(null), []);
+  assert.deepEqual(fluxPlanRows({}), []);
+  assert.deepEqual(fluxPlanRows({ planData: { rows: [{ _isSubtotal: true }] } }), []);
+});
 
 test('finds the heading row when a plan opens with a title', () => {
   // The IBUCAP plan puts "IBUCAP Cold & Flu" on row 1, which made every column

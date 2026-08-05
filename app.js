@@ -27,6 +27,10 @@ const ROLE_SLOTS = [...new Set([...WORKFLOW_TEMPLATE.map((s) => s.role), 'Bookke
 let state = { members: [], campaigns: [], tasks: [], member: null };
 let can = capabilities(null);
 let preview = [];
+// Where the current preview came from: {type:'file'} or {type:'flux', plan}.
+// Decides the campaign name and whether flux_plan_id links it on import.
+let previewSource = null;
+let fluxPlans = [];
 let activeTask = null;
 let authMode = 'signin';
 
@@ -499,17 +503,50 @@ function previewWorkbook(file) {
       if (headerRow < 0) throw new Error('Could not find the heading row. The sheet needs columns named DATE, ACTIVATION, PLATFORM and Country in one row.');
       const rows = normaliseRows(window.XLSX.utils.sheet_to_json(sheet, { range: headerRow, defval: '' }));
       if (!rows.length) throw new Error(`Found headings on row ${headerRow + 1}, but no row below them had a date, an activation and a platform.`);
-      const brand = $('importBrand').value;
-      preview = rows.map((row) => ({ ...row, error: validateActivation({ ...row, brand }) }));
-      const valid = preview.filter((r) => !r.error);
-      $('importPreview').innerHTML = `<b>${valid.length} valid activation rows · ${preview.length - valid.length} rejected</b>${preview.slice(0, 20).map((r) => `<div class="${r.error ? 'error' : ''}">${escape(r.date)} · ${escape(r.activation)} · ${escape(r.platform)} · ${escape(r.market)}${r.error ? ` — ${escape(r.error)}` : ''}</div>`).join('')}`;
-      $('confirmImport').disabled = !valid.length;
+      previewSource = { type: 'file' };
+      $('fluxPlanSelect').value = '';
+      renderImportPreview(rows);
     } catch (err) {
       $('importPreview').innerHTML = `<span class="error">Could not read spreadsheet: ${escape(err.message)}</span>`;
       $('confirmImport').disabled = true;
     }
   };
   reader.readAsArrayBuffer(file);
+}
+
+// One preview path for both doors: eligibility is checked against the chosen
+// brand regardless of whether the rows came from a spreadsheet or a plan.
+function renderImportPreview(rows) {
+  const brand = $('importBrand').value;
+  preview = rows.map((row) => ({ ...row, error: validateActivation({ ...row, brand }) }));
+  const valid = preview.filter((r) => !r.error);
+  $('importPreview').innerHTML = `<b>${valid.length} valid activation rows · ${preview.length - valid.length} rejected</b>${preview.slice(0, 20).map((r) => `<div class="${r.error ? 'error' : ''}">${escape(r.date)} · ${escape(r.activation)} · ${escape(r.platform)} · ${escape(r.market)}${r.error ? ` — ${escape(r.error)}` : ''}</div>`).join('')}`;
+  $('confirmImport').disabled = !valid.length;
+}
+
+// Published plans arrive when the dialog opens; failure to load them must not
+// block the spreadsheet path, so it degrades to a note instead of an error.
+async function loadFluxPlans() {
+  if (!db) { $('fluxPlanRow').classList.add('hidden'); return; }
+  $('fluxPlanRow').classList.remove('hidden');
+  try {
+    fluxPlans = await db.listPublishedPlans();
+    const options = fluxPlans.map((plan) => `<option value="${plan.id}">${escape(plan.name)} — ${escape(plan.country)} · $${(plan.totalBudget || 0).toLocaleString('en-ZA')} · ${plan.rows.length} rows</option>`).join('');
+    $('fluxPlanSelect').innerHTML = `<option value="">${fluxPlans.length ? 'Choose a published plan…' : 'No plans published from FluxPlanner yet'}</option>${options}`;
+  } catch (error) {
+    console.error(error);
+    $('fluxPlanSelect').innerHTML = '<option value="">Could not load published plans</option>';
+  }
+}
+
+function selectFluxPlan() {
+  const plan = fluxPlans.find((p) => p.id === $('fluxPlanSelect').value);
+  if (!plan) { previewSource = null; preview = []; $('importPreview').innerHTML = ''; $('confirmImport').disabled = true; return; }
+  previewSource = { type: 'flux', plan };
+  $('fileInput').value = '';
+  if (!plan.rows.length) return importError('That plan has no usable rows — it may predate the row format GSD understands.');
+  importError('');
+  renderImportPreview(plan.rows);
 }
 
 async function importRows() {
@@ -519,7 +556,13 @@ async function importRows() {
   if (!valid.length) return importError('No rows passed validation, so there is nothing to import.');
   if (db && !can.isManager) return importError('Only Shane, Elvis or Zaida can import a plan.');
   const markets = [...new Set(valid.map((r) => r.market))];
-  const details = { brand, name: `${brand} · ${valid[0].activation} plan`, market: markets.length === 1 ? markets[0] : 'Multiple markets' };
+  const fromFlux = previewSource?.type === 'flux' ? previewSource.plan : null;
+  const details = {
+    brand,
+    name: fromFlux ? fromFlux.name : `${brand} · ${valid[0].activation} plan`,
+    market: markets.length === 1 ? markets[0] : 'Multiple markets',
+    fluxPlanId: fromFlux?.id || null
+  };
   const owner = memberWithRole('Paid Media Owner');
 
   if (!db) {
@@ -602,10 +645,14 @@ function bindEvents() {
   $('authForm').onsubmit = guard(submitGate, authError);
   $('authSecondary').onclick = () => showGate(authMode === 'signin' ? 'signup' : 'signin');
   $('signOut').onclick = guard(signOut);
-  $('uploadButton').onclick = () => $('importDialog').showModal();
+  $('uploadButton').onclick = guard(() => { $('importDialog').showModal(); return loadFluxPlans(); });
   $('addTaskButton').onclick = newTask;
   $('fileInput').onchange = (e) => e.target.files[0] && previewWorkbook(e.target.files[0]);
-  $('importBrand').onchange = () => { const file = $('fileInput').files[0]; if (file) previewWorkbook(file); };
+  $('fluxPlanSelect').onchange = guard(selectFluxPlan);
+  $('importBrand').onchange = () => {
+    if (previewSource?.type === 'flux') return selectFluxPlan();
+    const file = $('fileInput').files[0]; if (file) previewWorkbook(file);
+  };
   $('confirmImport').onclick = guard((event) => { event.preventDefault(); return importRows(); }, importError);
   $('seedDemo').onclick = guard(loadDemo);
   $('saveTask').onclick = guard(async (event) => { event.preventDefault(); if (await saveTask()) $('taskDialog').close(); });
