@@ -847,6 +847,8 @@ function guard(handler, onError) {
 
 function bindEvents() {
   const titles = { overview: 'Today’s operations', tasks: 'Task command centre', posts: 'Post pipeline', campaigns: 'Campaigns', spend: 'Paid media spend', reports: 'Reporting queue', settings: 'Workspace settings' };
+  const shell = document.querySelector('.shell');
+  const closeMenu = () => { shell.classList.remove('nav-open'); $('menuButton').setAttribute?.('aria-expanded', 'false'); };
   document.querySelectorAll('.nav').forEach((b) => {
     b.onclick = () => {
       document.querySelectorAll('.nav').forEach((n) => n.classList.remove('active'));
@@ -854,7 +856,16 @@ function bindEvents() {
       document.querySelectorAll('.view').forEach((v) => v.classList.add('hidden'));
       $(`${b.dataset.view}View`).classList.remove('hidden');
       $('pageTitle').textContent = titles[b.dataset.view];
+      closeMenu();
     };
+  });
+  $('menuButton').onclick = (event) => {
+    event.stopPropagation();
+    const open = shell.classList.toggle('nav-open');
+    $('menuButton').setAttribute?.('aria-expanded', String(open));
+  };
+  document.addEventListener('click', (event) => {
+    if (shell.classList.contains('nav-open') && !event.target.closest('nav') && !event.target.closest('.menu-button')) closeMenu();
   });
   $('importBrand').innerHTML = brandOptions();
   $('authForm').onsubmit = guard(submitGate, authError);

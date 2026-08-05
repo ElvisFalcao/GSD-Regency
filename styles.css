@@ -132,7 +132,7 @@ select:disabled,input:disabled,textarea:disabled{background:#f5f9f8;color:var(--
    stacked on the theme's icons it forced a 565px minimum width, and phones
    zoomed the whole app out to fit it. */
 @media(max-width:860px){
-  nav{flex-wrap:wrap;justify-content:flex-end;row-gap:4px}
+
   .pipe-row{flex-wrap:wrap;row-gap:6px}
   .pipe-state{margin-left:0;white-space:normal;width:100%}
   .pipe-platform{min-width:64px}
@@ -144,4 +144,27 @@ select:disabled,input:disabled,textarea:disabled{background:#f5f9f8;color:var(--
   .proposal-bar{flex-direction:column;align-items:flex-start}
   .admin-row b{min-width:0}
   .whoami{display:none}
+}
+
+/* Mobile nav: a hamburger opening a dropdown card. The icon row wrapped onto
+   two lines once the app grew to seven views; labels come back inside the
+   dropdown, where there is room for them. Selectors carry .shell so they
+   outrank the theme block, which loads after this sheet. */
+.menu-button{display:none;position:relative;width:40px;height:40px;border:0;border-radius:11px;background:rgba(255,255,255,.10);cursor:pointer;padding:0}
+.menu-button i{position:absolute;left:11px;right:11px;height:2px;border-radius:2px;background:#eef8f7;transition:transform .22s ease,opacity .16s ease,top .22s ease}
+.menu-button i:nth-child(1){top:14px}
+.menu-button i:nth-child(2){top:19px}
+.menu-button i:nth-child(3){top:24px}
+.nav-open .menu-button i:nth-child(1){top:19px;transform:rotate(45deg)}
+.nav-open .menu-button i:nth-child(2){opacity:0}
+.nav-open .menu-button i:nth-child(3){top:19px;transform:rotate(-45deg)}
+@media(max-width:860px){
+  .menu-button{display:block;margin-left:auto;flex-shrink:0}
+  .shell aside{position:relative;z-index:35}
+  .shell nav{position:absolute;top:calc(100% + 6px);left:12px;right:12px;margin:0;display:flex;flex-direction:column;gap:4px;padding:10px;background:#fff;border-radius:16px;box-shadow:0 24px 55px rgba(21,50,61,.30);opacity:0;transform:translateY(-8px);pointer-events:none;transition:opacity .18s ease,transform .22s ease}
+  .shell.nav-open nav{opacity:1;transform:none;pointer-events:auto}
+  .shell .nav{width:100%;display:flex;align-items:center;gap:12px;padding:11px 13px;color:#315a69;border-radius:11px;font-size:13px}
+  .shell .nav>span:last-child{display:inline}
+  .shell .nav:hover{background:#f4f8f7;transform:none;color:#1d3540}
+  .shell .nav.active{background:#208197;color:#fff;box-shadow:none}
 }
