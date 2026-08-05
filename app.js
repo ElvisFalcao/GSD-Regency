@@ -33,6 +33,7 @@ let previewSource = null;
 let fluxPlans = [];
 let activeTask = null;
 let authMode = 'signin';
+let recovering = false;
 
 const $ = (id) => document.getElementById(id);
 function escape(value = '') { const el = document.createElement('span'); el.textContent = value; return el.innerHTML; }
@@ -51,11 +52,17 @@ function campaignOptions(selected = '') { return `<option value="">General / no 
 async function boot() {
   bindEvents();
   if (!configured) return startDemo();
-  client.auth.onAuthStateChange(() => { refresh().catch((error) => { console.error(error); toast(error.message); }); });
+  // A recovery link signs the user in with a short-lived session; until they
+  // have chosen a new password, every other event must not hide that screen.
+  client.auth.onAuthStateChange((event) => {
+    if (event === 'PASSWORD_RECOVERY') { recovering = true; return showGate('recover'); }
+    refresh().catch((error) => { console.error(error); toast(error.message); });
+  });
   await refresh();
 }
 
 async function refresh() {
+  if (recovering) return showGate('recover');
   const { data: { session } } = await client.auth.getSession();
   if (!session) return showGate('signin');
 
@@ -77,9 +84,18 @@ async function refresh() {
   render();
 }
 
+// Where this app lives right now — localhost in dev, GitHub Pages deployed.
+// Auth emails carry this as their return address, so the reset link comes
+// back to the same app the person started from instead of the project-wide
+// Site URL default (which once pointed at localhost:3000 and stranded a
+// perfectly good recovery link on a dead port).
+function appUrl() { return window.location.origin + window.location.pathname.replace(/index\.html$/, ''); }
+
 const GATES = {
-  signin: { title: 'Sign in', intro: 'Use your Regency email address.', submit: 'Sign in', secondary: 'Create an account', fields: true },
-  signup: { title: 'Create an account', intro: 'Register with your Regency email. A manager links you to the workspace before anything unlocks.', submit: 'Create account', secondary: 'I already have an account', fields: true }
+  signin: { title: 'Sign in', intro: 'Use your Regency email address.', submit: 'Sign in', secondary: 'Create an account', secondaryTarget: 'signup', email: true, password: true, forgot: true },
+  signup: { title: 'Create an account', intro: 'Register with your Regency email. A manager links you to the workspace before anything unlocks.', submit: 'Create account', secondary: 'I already have an account', secondaryTarget: 'signin', email: true, password: true },
+  forgot: { title: 'Reset your password', intro: 'Enter your email and we send a link. It opens this app and asks you for a new password.', submit: 'Send reset link', secondary: 'Back to sign in', secondaryTarget: 'signin', email: true },
+  recover: { title: 'Choose a new password', intro: 'You followed a recovery link, so you are signed in — set the new password for your account now.', submit: 'Save new password', password: true, password2: true }
 };
 
 // Shown to anyone signed in but not yet active: registered and waiting, or
@@ -125,11 +141,16 @@ function showGate(mode, message = '') {
   const gate = GATES[mode];
   $('authTitle').textContent = gate.title;
   $('authIntro').textContent = gate.intro;
-  $('authFields').classList.toggle('hidden', !gate.fields);
+  $('authEmailRow').classList.toggle('hidden', !gate.email);
+  $('authPasswordRow').classList.toggle('hidden', !gate.password);
+  $('authPassword2Row').classList.toggle('hidden', !gate.password2);
   $('authSubmit').textContent = gate.submit;
-  $('authSubmit').classList.toggle('hidden', !gate.submit);
-  $('authSecondary').textContent = gate.secondary;
-  $('authPassword').autocomplete = mode === 'signup' ? 'new-password' : 'current-password';
+  $('authSecondary').textContent = gate.secondary || '';
+  $('authSecondary').classList.toggle('hidden', !gate.secondary);
+  $('authForgot').classList.toggle('hidden', !gate.forgot);
+  $('authPassword').autocomplete = mode === 'signin' ? 'current-password' : 'new-password';
+  const passwordLabel = $('authPasswordRow').firstChild;
+  if (passwordLabel) passwordLabel.textContent = gate.password2 ? 'New password' : 'Password';
   authError(message);
   $('authGate').classList.remove('hidden');
 }
@@ -143,13 +164,27 @@ async function submitGate(event) {
   const password = $('authPassword').value;
   try {
     if (authMode === 'signin') {
+      if (!email || !password) return authError('Enter your email and password.');
       const { error } = await client.auth.signInWithPassword({ email, password });
       if (error) throw error;
     } else if (authMode === 'signup') {
-      const { error } = await client.auth.signUp({ email, password });
+      if (!email || password.length < 8) return authError('Enter your email and a password of at least 8 characters.');
+      const { error } = await client.auth.signUp({ email, password, options: { emailRedirectTo: appUrl() } });
       if (error) throw error;
       // A session may not exist yet if the project requires email confirmation.
       return showGate('signin', 'Account created. Confirm your email if prompted, then sign in.');
+    } else if (authMode === 'forgot') {
+      if (!email) return authError('Enter the email you registered with.');
+      const { error } = await client.auth.resetPasswordForEmail(email, { redirectTo: appUrl() });
+      if (error) throw error;
+      return showGate('signin', 'Reset link sent — check the inbox. The link opens this app and asks for a new password.');
+    } else if (authMode === 'recover') {
+      if (password.length < 8) return authError('Use at least 8 characters.');
+      if (password !== $('authPassword2').value) return authError('The two passwords do not match.');
+      const { error } = await client.auth.updateUser({ password });
+      if (error) throw error;
+      recovering = false;
+      toast('Password updated.');
     }
     await refresh();
   } catch (error) { authError(error.message); }
@@ -728,7 +763,8 @@ function bindEvents() {
   });
   $('importBrand').innerHTML = brandOptions();
   $('authForm').onsubmit = guard(submitGate, authError);
-  $('authSecondary').onclick = () => showGate(authMode === 'signin' ? 'signup' : 'signin');
+  $('authSecondary').onclick = () => showGate(GATES[authMode].secondaryTarget || 'signin');
+  $('authForgot').onclick = () => showGate('forgot');
   $('signOut').onclick = guard(signOut);
   $('uploadButton').onclick = guard(() => { $('importDialog').showModal(); return loadFluxPlans(); });
   $('addTaskButton').onclick = newTask;

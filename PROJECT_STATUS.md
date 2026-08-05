@@ -148,6 +148,7 @@ Blank either Supabase value in `config.js` to fall back to demo mode, which need
 - [ ] Confirm the import path works end to end — **currently failing, cause not yet identified**
 - [ ] Have a second person register, to prove approval and linking
 - [ ] Enable leaked-password protection in Supabase Auth
+- [ ] Auth → URL Configuration: Site URL `https://elvisfalcao.github.io/GSD-Regency`, additional redirect URLs `https://elvisfalcao.github.io/GSD-Regency/**`, `https://elvisfalcao.github.io/FluxPlanner-Pro/**`, `http://localhost:4173/**` — reset and confirmation emails bounce off this allow-list
 - [ ] Set `GRANOLA_SYNC_SECRET`, then send one controlled payload and verify the task appears
 - [ ] Personal `@regency.global` addresses; update `pm_members.email` to match, since reminders go there
 - [ ] Deploy and test `report-sync`, `dispatch-reminders`, `fluxplanner-sync`

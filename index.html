@@ -83,12 +83,14 @@
         <h2 id="authTitle">Sign in</h2>
         <p id="authIntro">Use your Regency email address.</p>
         <div id="authFields">
-          <label>Email<input id="authEmail" type="email" autocomplete="email" required /></label>
-          <label>Password<input id="authPassword" type="password" autocomplete="current-password" minlength="8" required /></label>
+          <label id="authEmailRow">Email<input id="authEmail" type="email" autocomplete="email" /></label>
+          <label id="authPasswordRow">Password<input id="authPassword" type="password" autocomplete="current-password" minlength="8" /></label>
+          <label id="authPassword2Row" class="hidden">Repeat the new password<input id="authPassword2" type="password" autocomplete="new-password" minlength="8" /></label>
         </div>
         <p id="authError" class="error" role="alert"></p>
         <button id="authSubmit" class="primary" type="submit">Sign in</button>
         <button id="authSecondary" class="secondary" type="button">Create an account</button>
+        <button id="authForgot" class="linklike" type="button">Forgot your password?</button>
       </form>
     </div>
     <script type="module" src="app.js"></script>
