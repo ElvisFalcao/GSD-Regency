@@ -1,4 +1,4 @@
-import { BRAND_CATALOG, PLATFORM_IDS, WORKFLOW_TEMPLATE, normaliseRows, validateActivation, createActivationTasks, taskFlags, findHeaderRow, groupContentTasks, detectBrand } from './lib/automation.js';
+import { BRAND_CATALOG, PLATFORM_IDS, WORKFLOW_TEMPLATE, normaliseRows, validateActivation, createActivationTasks, taskFlags, findHeaderRow, groupContentTasks, detectBrand, buildPostPipeline } from './lib/automation.js';
 import { createDataLayer, capabilities } from './lib/data.js';
 
 const cfg = window.PM_CONFIG || {};
@@ -179,7 +179,7 @@ function persistDemo() { localStorage.setItem(DEMO_KEY, JSON.stringify({ campaig
 
 function render() {
   applyCapabilities();
-  renderOverview(); renderTasks(); renderCampaigns(); renderSpend(); renderReports(); renderSettings();
+  renderOverview(); renderTasks(); renderPosts(); renderCampaigns(); renderSpend(); renderReports(); renderSettings();
   renderNotifications();
 }
 
@@ -291,6 +291,54 @@ function renderTasks() {
     && (!filters.type || t.type === filters.type) && (!filters.status || t.status === filters.status)
     && (!filters.assignment || (t.assignmentState || 'confirmed') === filters.assignment));
   $('taskTable').innerHTML = `<table><thead><tr><th>Task</th><th>Campaign / Brand</th><th>Assigned to</th><th>Due</th><th>Status</th></tr></thead><tbody>${tasks.map((t) => `<tr data-task-id="${t.id}"><td><b>${escape(t.title)}</b><br><span class="badge ${t.type}">${t.type || 'To-do'}</span>${t.assignmentState === 'proposed' ? ' <span class="badge proposed">pre-assigned</span>' : ''}</td><td>${escape(campaignName(t.campaignId))}</td><td>${escape(memberName(t.assigneeId))}</td><td class="${taskStatus(t).overdue ? 'due overdue' : ''}">${escape(t.dueDate)}</td><td>${escape(t.status)}</td></tr>`).join('') || '<tr><td colspan="5">No tasks match these filters.</td></tr>'}</tbody></table>`;
+  bindTaskCards();
+}
+
+// --- post pipeline -------------------------------------------------------
+// One line per planned post: asset → post → boost → report, with the current
+// holder visible. Chasing means clicking the stage that is stuck.
+
+const STAGE_LABELS = { content: 'Asset', post: 'Post', boost: 'Boost', report: 'Report' };
+const CURRENT_LABELS = { content: 'Waiting on the asset', post: 'Ready to post', boost: 'Boost due', report: 'Awaiting report', complete: 'Complete' };
+
+function renderPosts() {
+  const fill = $('postsCampaignFilter');
+  const chosen = fill.value;
+  fill.innerHTML = `<option value="">All campaigns</option>${state.campaigns.map((c) => `<option value="${c.id}" ${c.id === chosen ? 'selected' : ''}>${escape(c.name)}</option>`).join('')}`;
+
+  let placements = buildPostPipeline(state.tasks, today());
+  if (fill.value) placements = placements.filter((p) => p.campaignId === fill.value);
+  if ($('postsAttention').checked) placements = placements.filter((p) => p.overdue || p.blocked);
+
+  // One card per activation × date; its platforms are rows inside it, sharing
+  // one asset. That mirrors how the work actually happens.
+  const groups = new Map();
+  for (const placement of placements) {
+    const key = `${placement.campaignId}:${placement.activation}:${placement.date}`;
+    if (!groups.has(key)) groups.set(key, { activation: placement.activation, date: placement.date, campaignId: placement.campaignId, content: placement.stages.content, rows: [] });
+    groups.get(key).rows.push(placement);
+  }
+
+  const stageChip = (stage, task) => {
+    if (!task) return `<span class="stage-chip missing">${STAGE_LABELS[stage]}</span>`;
+    const flags = taskStatus(task);
+    const cls = task.status === 'Done' ? 'done' : task.status === 'Blocked' ? 'blocked' : flags.overdue ? 'overdue' : task.status === 'In progress' ? 'active' : 'todo';
+    const link = stage === 'post' && task.liveLink ? ' 🔗' : '';
+    return `<button type="button" class="stage-chip ${cls}" data-task-id="${task.id}" title="${escape(task.status)} · ${escape(memberName(task.assigneeId))}${task.dueDate ? ` · due ${escape(task.dueDate)}` : ''}">${STAGE_LABELS[stage]}${link}</button>`;
+  };
+
+  $('postsBoard').innerHTML = [...groups.values()].map((group) => {
+    const done = group.rows.filter((p) => p.current === 'complete').length;
+    return `<article class="pipe-card">
+      <header><div><p class="eyebrow">${escape(campaignName(group.campaignId))} · ${escape(group.date)}</p><h3>${escape(group.activation)}</h3></div><b>${done}/${group.rows.length} complete</b></header>
+      ${group.content ? `<div class="pipe-asset">${stageChip('content', group.content)} <span>${escape(group.content.title)} — ${escape(memberName(group.content.assigneeId))}</span></div>` : ''}
+      ${group.rows.map((p) => `<div class="pipe-row ${p.overdue ? 'overdue' : ''}">
+        <span class="pipe-platform">${escape(p.platform)}</span>
+        <span class="pipe-stages">${['post', 'boost', 'report'].map((stage) => stageChip(stage, p.stages[stage])).join('<i class="pipe-arrow">→</i>')}</span>
+        <span class="pipe-state ${p.overdue ? 'overdue' : ''} ${p.current === 'complete' ? 'done' : ''}">${p.blocked ? 'Blocked' : p.overdue ? `${CURRENT_LABELS[p.current]} — overdue` : CURRENT_LABELS[p.current]}${p.currentTask ? ` · ${escape(memberName(p.currentTask.assigneeId))}` : ''}</span>
+      </div>`).join('')}
+    </article>`;
+  }).join('') || `<p class="quiet-note">${$('postsAttention').checked ? 'Nothing needs chasing — every post is on track.' : 'No planned posts yet. Import a budget plan or a published FluxPlanner plan to fill this view.'}</p>`;
   bindTaskCards();
 }
 
@@ -668,7 +716,7 @@ function guard(handler, onError) {
 }
 
 function bindEvents() {
-  const titles = { overview: 'Today’s operations', tasks: 'Task command centre', campaigns: 'Campaigns', spend: 'Paid media spend', reports: 'Reporting queue', settings: 'Workspace settings' };
+  const titles = { overview: 'Today’s operations', tasks: 'Task command centre', posts: 'Post pipeline', campaigns: 'Campaigns', spend: 'Paid media spend', reports: 'Reporting queue', settings: 'Workspace settings' };
   document.querySelectorAll('.nav').forEach((b) => {
     b.onclick = () => {
       document.querySelectorAll('.nav').forEach((n) => n.classList.remove('active'));
@@ -701,6 +749,8 @@ function bindEvents() {
   ['taskSearch', 'brandFilter', 'marketFilter', 'platformFilter', 'assigneeFilter', 'typeFilter', 'statusFilter']
     .forEach((id) => $(id).addEventListener(id === 'taskSearch' ? 'input' : 'change', renderTasks));
   $('spendGroup').addEventListener('change', renderSpend);
+  $('postsCampaignFilter').addEventListener('change', renderPosts);
+  $('postsAttention').addEventListener('change', renderPosts);
 }
 
 // A rejection here would otherwise leave the page blank with nothing but a

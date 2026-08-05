@@ -71,3 +71,29 @@
 .notif-more{padding:10px 12px;color:#7f969e;font-size:11px}
 .proposal-actions{display:flex;gap:8px}
 .proposal-actions .secondary{border:1px solid #e7c9b6;background:#fff}
+
+/* Post pipeline */
+.pipe-controls{display:flex;align-items:center;gap:14px}
+.pipe-controls select{padding:7px 10px;border:1px solid #dfeaea;border-radius:9px;font-size:11px}
+.attention-toggle{display:flex;align-items:center;gap:6px;color:#315a69;font:600 11px 'DM Sans',sans-serif;cursor:pointer}
+.pipe-card{margin-bottom:16px;padding:18px 20px;border:1px solid #e7eeee;border-radius:15px;background:#fff;box-shadow:0 14px 34px rgba(47,86,99,.08)}
+.pipe-card header{display:flex;align-items:center;justify-content:space-between;padding:0 0 12px;border:0;min-height:0}
+.pipe-card header h3{margin:2px 0 0;font:700 17px 'Fraunces',serif;color:#1d3540}
+.pipe-card header b{color:#208197;font:700 13px 'DM Sans',sans-serif}
+.pipe-asset{display:flex;align-items:center;gap:10px;margin-bottom:10px;padding:8px 10px;border-radius:10px;background:#f4f8f7;font-size:11px;color:#7f969e}
+.pipe-row{display:flex;align-items:center;gap:12px;padding:8px 10px;border-radius:10px}
+.pipe-row:hover{background:#f4faf9}
+.pipe-row.overdue{background:#fdf6f4}
+.pipe-platform{min-width:78px;color:#1d3540;font:700 12px 'DM Sans',sans-serif}
+.pipe-stages{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+.pipe-arrow{color:#c3d4d6;font-style:normal;font-size:11px}
+.stage-chip{padding:5px 11px;border:1px solid #dfeaea;border-radius:16px;background:#f5f9f8;color:#7f969e;font:600 10px 'DM Sans',sans-serif;cursor:pointer}
+.stage-chip.done{border-color:#bfe3cd;background:#e7f5ec;color:#1e7d4f}
+.stage-chip.active{border-color:#9bd2da;background:#dff0f2;color:#17677a}
+.stage-chip.overdue{border-color:#f0c3c2;background:#fdf2f2;color:#a63a39}
+.stage-chip.blocked{border-color:#e8c9a8;background:#faf0e2;color:#8a5a1f}
+.stage-chip.missing{opacity:.4;cursor:default}
+.pipe-state{margin-left:auto;color:#7f969e;font-size:11px;white-space:nowrap}
+.pipe-state.overdue{color:#a63a39;font-weight:700}
+.pipe-state.done{color:#1e7d4f;font-weight:700}
+.quiet-note{color:#7f969e;font-size:13px}

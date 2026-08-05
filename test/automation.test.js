@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { addBusinessDays, createActivationTasks, normaliseRows, validateActivation, findHeaderRow, parseMoney, roleForAssetType, groupContentTasks, subtractBusinessDays, fluxPlanRows, detectBrand } from '../lib/automation.js';
+import { addBusinessDays, createActivationTasks, normaliseRows, validateActivation, findHeaderRow, parseMoney, roleForAssetType, groupContentTasks, subtractBusinessDays, fluxPlanRows, detectBrand, buildPostPipeline } from '../lib/automation.js';
 
 test('maps a published FluxPlanner plan onto the import row shape', () => {
   // Mirrors what FluxPlanner's budget-engine actually writes: DD/MM/YYYY
@@ -24,6 +24,43 @@ test('maps a published FluxPlanner plan onto the import row shape', () => {
   });
   // The mapped rows must satisfy the same eligibility rules as a spreadsheet.
   assert.equal(validateActivation({ ...rows[0], brand: 'Ibucap' }), null);
+});
+
+test('builds the post pipeline: shared asset, per-platform chains, current stage', () => {
+  const tasks = [
+    { type: 'Content', activationKey: 'c1:Teaser:2026-08-07:content:Video', title: 'Teaser · Video for Instagram, Facebook', status: 'Done', dueDate: '2026-08-04', campaignId: 'c1' },
+    { type: 'Post', activationKey: 'c1:Teaser:2026-08-07:Instagram', platform: 'Instagram', status: 'Done', dueDate: '2026-08-07', campaignId: 'c1' },
+    { type: 'Boost', activationKey: 'c1:Teaser:2026-08-07:Instagram', platform: 'Instagram', status: 'Not started', dueDate: '2026-08-07', campaignId: 'c1' },
+    { type: 'Report', activationKey: 'c1:Teaser:2026-08-07:Instagram', platform: 'Instagram', status: 'Not started', dueDate: '2026-08-12', campaignId: 'c1' },
+    { type: 'Post', activationKey: 'c1:Teaser:2026-08-07:Facebook', platform: 'Facebook', status: 'Not started', dueDate: '2026-08-07', campaignId: 'c1' },
+    { type: 'Boost', activationKey: 'c1:Teaser:2026-08-07:Facebook', platform: 'Facebook', status: 'Not started', dueDate: '2026-08-07', campaignId: 'c1' },
+    // Noise that must not appear: a to-do and a meeting action.
+    { type: 'To-do', activationKey: 'manual:abc', status: 'Not started', dueDate: '2026-08-07', campaignId: '' },
+    { type: 'To-do', activationKey: 'granola:m1:action-0', status: 'Not started', dueDate: '2026-08-07', campaignId: '' }
+  ];
+  const pipeline = buildPostPipeline(tasks, '2026-08-08');
+  assert.equal(pipeline.length, 2);
+  const insta = pipeline.find((p) => p.platform === 'Instagram');
+  const fb = pipeline.find((p) => p.platform === 'Facebook');
+  // Both platform chains share the one asset.
+  assert.equal(insta.stages.content.title, 'Teaser · Video for Instagram, Facebook');
+  assert.equal(fb.stages.content, insta.stages.content);
+  // Instagram posted; the boost is what someone owes, and it ran yesterday.
+  assert.equal(insta.current, 'boost');
+  assert.equal(insta.overdue, true);
+  // Facebook has not posted; asset is done so the post is current.
+  assert.equal(fb.current, 'post');
+  assert.equal(insta.activation, 'Teaser');
+  assert.equal(insta.date, '2026-08-07');
+});
+
+test('a fully delivered placement reads complete', () => {
+  const done = (type, key) => ({ type, activationKey: key, platform: 'TikTok', status: 'Done', dueDate: '2026-08-01', campaignId: 'c1' });
+  const pipeline = buildPostPipeline([
+    done('Post', 'c1:Teaser:2026-08-01:TikTok'), done('Boost', 'c1:Teaser:2026-08-01:TikTok'), done('Report', 'c1:Teaser:2026-08-01:TikTok')
+  ], '2026-08-08');
+  assert.equal(pipeline[0].current, 'complete');
+  assert.equal(pipeline[0].overdue, false);
 });
 
 test('detects the brand a published plan belongs to', () => {

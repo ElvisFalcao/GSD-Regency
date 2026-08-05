@@ -23,6 +23,7 @@
         <nav>
           <button class="nav active" data-view="overview"><span class="nav-icon">◫</span><span>Overview</span></button>
           <button class="nav" data-view="tasks"><span class="nav-icon">✓</span><span>Tasks</span></button>
+          <button class="nav" data-view="posts"><span class="nav-icon">◉</span><span>Posts</span></button>
           <button class="nav" data-view="campaigns"><span class="nav-icon">◇</span><span>Campaigns</span></button>
           <button class="nav" data-view="spend"><span class="nav-icon">◈</span><span>Spend</span></button>
           <button class="nav" data-view="reports"><span class="nav-icon">▤</span><span>Reports</span></button>
@@ -55,6 +56,10 @@
             <select id="assignmentFilter"><option value="">All assignments</option><option value="proposed">Pre-assigned</option><option value="confirmed">Confirmed</option></select>
           </div>
           <div id="taskTable" class="table-wrap"></div>
+        </section>
+        <section id="postsView" class="view hidden">
+          <div class="section-heading"><div><p class="eyebrow">POST PIPELINE</p><h2>Where every post stands</h2></div><div class="pipe-controls"><select id="postsCampaignFilter"><option value="">All campaigns</option></select><label class="attention-toggle"><input type="checkbox" id="postsAttention" /> Only needs attention</label></div></div>
+          <div id="postsBoard"></div>
         </section>
         <section id="campaignsView" class="view hidden"><div class="section-heading"><div><p class="eyebrow">CAMPAIGNS</p><h2>Planning links and execution</h2></div></div><div id="campaignList" class="campaign-grid"></div></section>
         <section id="spendView" class="view hidden">
