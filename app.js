@@ -657,6 +657,7 @@ async function loadFluxPlans() {
 
 function selectFluxPlan() {
   const plan = fluxPlans.find((p) => p.id === $('fluxPlanSelect').value);
+  $('fluxUnpublish').classList.toggle('hidden', !plan || !can.isManager);
   if (!plan) { previewSource = null; preview = []; $('importPreview').innerHTML = ''; $('confirmImport').disabled = true; return; }
   previewSource = { type: 'flux', plan };
   $('fileInput').value = '';
@@ -770,6 +771,18 @@ function bindEvents() {
   $('addTaskButton').onclick = newTask;
   $('fileInput').onchange = (e) => e.target.files[0] && previewWorkbook(e.target.files[0]);
   $('fluxPlanSelect').onchange = guard(selectFluxPlan);
+  $('fluxUnpublish').onclick = guard(async () => {
+    const plan = previewSource?.type === 'flux' ? previewSource.plan : null;
+    if (!plan || !db) return;
+    $('fluxUnpublish').disabled = true;
+    try {
+      await db.unpublishPlan(plan.id);
+      toast(`"${plan.name}" removed — its author can republish it from FluxPlanner.`);
+      previewSource = null; preview = [];
+      $('importPreview').innerHTML = ''; $('confirmImport').disabled = true;
+      await loadFluxPlans();
+    } finally { $('fluxUnpublish').disabled = false; }
+  }, importError);
   $('importBrand').onchange = () => {
     if (previewSource?.type === 'flux') return selectFluxPlan();
     const file = $('fileInput').files[0]; if (file) previewWorkbook(file);
