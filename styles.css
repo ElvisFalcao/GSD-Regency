@@ -168,3 +168,10 @@ select:disabled,input:disabled,textarea:disabled{background:#f5f9f8;color:var(--
   .shell .nav:hover{background:#f4f8f7;transform:none;color:#1d3540}
   .shell .nav.active{background:#208197;color:#fff;box-shadow:none}
 }
+
+/* Mobile header balance: the title column is 1-2 elements against the action
+   column's three, which left dead space under the heading. Centre the title
+   against the taller stack. */
+@media(max-width:860px){
+  .shell header{align-items:center}
+}
