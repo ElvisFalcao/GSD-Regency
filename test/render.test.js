@@ -62,7 +62,9 @@ test('team board shows the real staff, not the old placeholders', () => {
 
 test('settings lists access levels and roles', () => {
   assert.match(nodes.get('settingsPanel').innerHTML, /Paid Media Owner/);
-  assert.match(nodes.get('settingsPanel').innerHTML, /Nobody is waiting for approval/);
+  // With nobody pending, the access-requests section does not render at all —
+  // an empty state here is noise, not information.
+  assert.doesNotMatch(nodes.get('settingsPanel').innerHTML, /Access requests/);
 });
 
 test('the membership panel offers every grantable role', () => {

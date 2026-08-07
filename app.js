@@ -570,36 +570,62 @@ function renderSettings() {
   // Approving means moving the auth account onto the person's real record, so
   // their seeded roles and title are already waiting. pm_link_member does it in
   // one statement; the alternative is approving someone into a duplicate row.
-  const requests = pending.length ? pending.map((m) => `<div class="admin-row">
-      <b>${escape(m.name)}</b><small>registered, not linked</small>
-      <select data-link-target="${m.id}">
-        <option value="">Link to…</option>
-        ${unlinked.map((t) => `<option value="${t.id}">${escape(t.name)} — ${escape(t.title || t.accessLevel)}</option>`).join('')}
-        <option value="__new">Approve as a new team member</option>
-      </select>
-      <button class="primary" data-link-confirm="${m.id}" type="button">Approve</button>
-      <button class="secondary" data-decline="${m.id}" type="button">Decline</button>
-    </div>`).join('') : '<p>Nobody is waiting for approval.</p>';
+  // The whole section only exists while someone is actually waiting.
+  const requests = pending.length ? `<section class="setting-block requests">
+      <header><h3>Access requests</h3><span class="count-badge">${pending.length}</span></header>
+      ${pending.map((m) => `<div class="admin-row">
+        <b>${escape(m.name)}</b><small>registered, not linked</small>
+        <select data-link-target="${m.id}">
+          <option value="">Link to…</option>
+          ${unlinked.map((t) => `<option value="${t.id}">${escape(t.name)} — ${escape(t.title || t.accessLevel)}</option>`).join('')}
+          <option value="__new">Approve as a new team member</option>
+        </select>
+        <button class="primary" data-link-confirm="${m.id}" type="button">Approve</button>
+        <button class="secondary" data-decline="${m.id}" type="button">Decline</button>
+      </div>`).join('')}
+    </section>` : '';
 
+  // One quiet row per person; the controls live behind a click. The expanded
+  // body stays in the DOM either way, so nothing about permissions changes —
+  // only how much of it shouts at once.
   const roster = team.map((m) => {
     const isSelf = m.id === state.member?.id;
     const levels = ['owner', 'admin', 'member', 'disabled'];
-    return `<div class="admin-row">
-      <b>${escape(m.name)}</b><small>${escape(m.email || 'no address')}${m.userId ? '' : ' · no account yet'}</small>
-      <select data-level="${m.id}" ${isSelf || (m.accessLevel === 'owner' && !can.isOwner) ? 'disabled' : ''}>
-        ${levels.map((l) => `<option value="${l}" ${l === m.accessLevel ? 'selected' : ''}>${l}</option>`).join('')}
-      </select>
-      <div class="role-chips">${ROLE_SLOTS.map((slot) => `<button type="button" class="role-chip ${m.roles?.includes(slot) ? 'on' : ''}" data-role-member="${m.id}" data-role-slot="${escape(slot)}">${escape(slot)}</button>`).join('')}</div>
+    return `<div class="member-row" data-member-row="${m.id}">
+      <button type="button" class="member-head" data-member-toggle="${m.id}">
+        <span class="team-avatar">${escape(m.name.charAt(0))}</span>
+        <span class="member-id"><b>${escape(m.name)}</b><small>${escape(m.title || '')}${m.userId ? '' : ' · no account yet'}</small></span>
+        <span class="badge level-${escape(m.accessLevel)}">${escape(m.accessLevel)}</span>
+        <i class="chev">▾</i>
+      </button>
+      <div class="member-body hidden">
+        <div class="member-meta"><small>${escape(m.email || 'no email')}</small>
+          <label class="level-label">Access
+            <select data-level="${m.id}" ${isSelf || (m.accessLevel === 'owner' && !can.isOwner) ? 'disabled' : ''}>
+              ${levels.map((l) => `<option value="${l}" ${l === m.accessLevel ? 'selected' : ''}>${l}</option>`).join('')}
+            </select>
+          </label>
+        </div>
+        <div class="role-chips">${ROLE_SLOTS.map((slot) => `<button type="button" class="role-chip ${m.roles?.includes(slot) ? 'on' : ''}" data-role-member="${m.id}" data-role-slot="${escape(slot)}">${escape(slot)}</button>`).join('')}</div>
+      </div>
     </div>`;
   }).join('');
 
-  $('settingsPanel').innerHTML = `<section class="setting"><h3>Waiting for access</h3>${requests}</section>`
-    + `<section class="setting"><h3>Team, access and roles</h3><p>Click a role to grant or remove it. Access level cannot be changed on your own account.</p>${roster}</section>`
-    + `<section class="setting"><h3>Workflow stages</h3><ul>${WORKFLOW_TEMPLATE.map((s) => `<li>${s.order}. ${s.name} → ${s.role}</li>`).join('')}</ul></section>`
-    + '<section class="setting"><h3>Platform connections</h3><div id="connectionsList" class="quiet-note">Loading…</div><menu><button id="connectMeta" class="secondary" type="button">Connect Meta</button></menu></section>'
-    + '<section class="setting"><h3>Notification channels</h3><p><b>In-app:</b> active<br><b>Email:</b> configure Resend secret + verified sender<br><b>Teams:</b> inactive until IT approves a scoped channel integration.</p></section>';
+  $('settingsPanel').innerHTML = requests
+    + `<section class="setting-block"><header><h3>Team, access and roles</h3><small>Click a person to manage their access and roles. Your own level is locked.</small></header><div class="member-list">${roster}</div></section>`
+    + '<section class="setting-block"><header><h3>Platform connections</h3><button id="connectMeta" class="secondary" type="button">Connect Meta</button></header><div id="connectionsList" class="quiet-note">Loading…</div></section>'
+    + `<section class="setting-block"><details class="workflow-ref"><summary><h3>Content workflow reference</h3><small>The 14 stages content moves through and which role owns each — this is what import routing reads. Reference only.</small><i class="chev">▾</i></summary><ol>${WORKFLOW_TEMPLATE.map((s) => `<li>${escape(s.name)} <span>→ ${escape(s.role)}</span></li>`).join('')}</ol></details></section>`
+    + '<section class="setting-block"><header><h3>Notification channels</h3></header><p class="quiet-note"><b>In-app:</b> active · <b>Email:</b> needs Resend configuration · <b>Teams:</b> awaiting IT approval.</p></section>';
 
   bindAdminControls();
+
+  document.querySelectorAll('[data-member-toggle]').forEach((button) => {
+    button.onclick = () => {
+      const row = document.querySelector(`[data-member-row="${button.dataset.memberToggle}"]`);
+      row?.querySelector('.member-body')?.classList.toggle('hidden');
+      row?.classList.toggle('open');
+    };
+  });
 
   $('connectMeta').onclick = guard(async () => {
     if (!db) return toast('Demo mode cannot connect platforms.');
@@ -611,14 +637,32 @@ function renderSettings() {
 }
 
 // Names and expiry only — the tokens live in a table no browser can read.
+// Grouped by what the thing is, each removable. Removal governs what GSD
+// holds; what Facebook grants next time is chosen on Facebook's own screen.
 async function loadConnections() {
   const el = $('connectionsList');
   if (!db) { el.textContent = 'Demo mode — platform connections need the live workspace.'; return; }
   try {
     const rows = await db.listConnections();
-    el.innerHTML = rows.length
-      ? `<ul>${rows.map((r) => `<li><b>${escape(r.name || r.external_id)}</b> — ${escape(r.platform)} ${escape(r.kind)}${r.token_expires_at ? ` · renew by ${escape(String(r.token_expires_at).slice(0, 10))}` : ''}</li>`).join('')}</ul>`
-      : 'Nothing connected yet. Connect Meta to start posting, boosting and pulling metrics.';
+    if (!rows.length) { el.textContent = 'Nothing connected yet. Connect Meta to start posting, boosting and pulling metrics.'; return; }
+    const LABELS = { page: 'Facebook pages', instagram: 'Instagram accounts', ad_account: 'Ad accounts', user: 'Connected login' };
+    el.innerHTML = ['page', 'instagram', 'ad_account', 'user']
+      .filter((kind) => rows.some((r) => r.kind === kind))
+      .map((kind) => {
+        const group = rows.filter((r) => r.kind === kind);
+        return `<div class="conn-group"><h4>${LABELS[kind]} <span class="count-badge">${group.length}</span></h4>${group.map((r) => `<div class="conn-row"><span><b>${escape(r.name || r.external_id)}</b>${r.token_expires_at ? `<small> · renew by ${escape(String(r.token_expires_at).slice(0, 10))}</small>` : ''}</span><button type="button" class="linklike danger" data-conn-remove="${escape(`${r.platform}:${r.kind}:${r.external_id}`)}">remove</button></div>`).join('')}</div>`;
+      }).join('')
+      + '<p class="quiet-note">Removing takes it out of GSD. To stop Facebook granting it at all, untick it on the consent screen next time you connect.</p>';
+    document.querySelectorAll('[data-conn-remove]').forEach((button) => {
+      button.onclick = guard(async () => {
+        const [platform, kind, ...rest] = button.dataset.connRemove.split(':');
+        const label = button.closest('.conn-row')?.querySelector('b')?.textContent || 'this connection';
+        if (!window.confirm(`Remove ${label}? GSD loses access to it until it is reconnected.`)) return;
+        button.disabled = true;
+        try { await db.removeConnection(platform, kind, rest.join(':')); toast(`${label} removed.`); await loadConnections(); }
+        finally { button.disabled = false; }
+      });
+    });
   } catch (error) { el.textContent = error.message; }
 }
 
