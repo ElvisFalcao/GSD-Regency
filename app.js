@@ -759,9 +759,11 @@ function publishBox() {
   return `<div class="publish-box"><p class="eyebrow">PUBLISH TO FACEBOOK</p>
     <label>Page<select id="pubPage"><option value="">Loading pages…</option></select></label>
     <label>Caption<textarea id="pubMessage" placeholder="Write the caption…">${escape(activeTask.notes || '')}</textarea></label>
-    <label>Link to attach (optional)<input id="pubLink" type="url" placeholder="https://" /></label>
+    <label>Creative — photo or video<input id="pubFile" type="file" accept="image/*,video/mp4,video/quicktime" /></label>
+    <label>…or a direct media URL<input id="pubMediaUrl" type="url" placeholder="https:// direct link to an image or .mp4 (use this for big videos)" /></label>
+    <label>Link to attach (text posts only)<input id="pubLink" type="url" placeholder="https://" /></label>
     <button id="pubGo" class="primary" type="button">Post now</button>
-    <p class="quiet-note">Posts publicly to the selected page, marks this task Done and saves the post link here.</p>
+    <p class="quiet-note">Posts publicly to the selected page, marks this task Done and saves the post link here. Uploads are capped around 50MB — paste a direct URL for anything bigger.</p>
   </div>`;
 }
 
@@ -776,10 +778,24 @@ function bindPublishBox() {
     if (!pageId) return toast('Choose the page to post to.');
     if (!message) return toast('Write the caption first.');
     const pageName = $('pubPage').selectedOptions?.[0]?.text || 'the selected page';
-    if (!window.confirm(`Post this publicly to ${pageName} now?`)) return;
+    const file = $('pubFile').files?.[0];
+    let mediaUrl = $('pubMediaUrl').value.trim();
+    let mediaType = '';
+    if (file) {
+      if (file.size > 49 * 1024 * 1024) return toast('That file is over the 50MB upload cap — host it and paste a direct URL instead.');
+      mediaType = file.type.startsWith('video') ? 'video' : 'photo';
+    } else if (mediaUrl) {
+      mediaType = /\.(mp4|mov|m4v)(\?|$)/i.test(mediaUrl) ? 'video' : 'photo';
+    }
+    const what = mediaType ? `this ${mediaType}` : 'this text post';
+    if (!window.confirm(`Post ${what} publicly to ${pageName} now?`)) return;
     go.disabled = true;
     try {
-      const out = await db.publishTask({ taskId: activeTask.id, pageId, message, link: $('pubLink').value.trim() }, cfg.supabaseUrl, cfg.supabaseAnonKey);
+      if (file) {
+        toast('Uploading the creative…');
+        mediaUrl = await db.uploadCreative(file, activeTask.id);
+      }
+      const out = await db.publishTask({ taskId: activeTask.id, pageId, message, link: $('pubLink').value.trim(), mediaUrl, mediaType }, cfg.supabaseUrl, cfg.supabaseAnonKey);
       const index = state.tasks.findIndex((t) => t.id === activeTask.id);
       if (index >= 0) state.tasks[index] = { ...state.tasks[index], status: 'Done', liveLink: out.url };
       $('taskDialog').close();

@@ -36,7 +36,7 @@ Deno.serve(async (request) => {
     return Response.json({ error: 'Only Shane, Elvis or Zaida can publish' }, { status: 403, headers: cors });
   }
 
-  const { taskId, pageId, message, link } = await request.json().catch(() => ({}));
+  const { taskId, pageId, message, link, mediaUrl, mediaType } = await request.json().catch(() => ({}));
   if (!taskId || !pageId || !String(message ?? '').trim()) {
     return Response.json({ error: 'taskId, pageId and a message are required' }, { status: 400, headers: cors });
   }
@@ -54,24 +54,42 @@ Deno.serve(async (request) => {
     .maybeSingle();
   if (!conn) return Response.json({ error: 'That page is not connected. Check Workspace settings.' }, { status: 404, headers: cors });
 
-  const body = new URLSearchParams({ message: String(message).trim(), access_token: conn.access_token });
-  if (link) body.set('link', String(link));
-  const graphRes = await fetch(`${GRAPH}/${conn.external_id}/feed`, { method: 'POST', body });
-  const posted = (await graphRes.json()) as { id?: string; error?: { message: string } };
-  if (!posted.id) {
+  // Text, photo and video use three different Graph endpoints. The caption
+  // parameter differs per endpoint too — Facebook's API, not our choice.
+  const caption = String(message).trim();
+  let endpoint = `${GRAPH}/${conn.external_id}/feed`;
+  const body = new URLSearchParams({ access_token: conn.access_token });
+  if (mediaUrl && mediaType === 'photo') {
+    endpoint = `${GRAPH}/${conn.external_id}/photos`;
+    body.set('url', String(mediaUrl));
+    body.set('caption', caption);
+  } else if (mediaUrl && mediaType === 'video') {
+    endpoint = `${GRAPH}/${conn.external_id}/videos`;
+    body.set('file_url', String(mediaUrl));
+    body.set('description', caption);
+  } else {
+    body.set('message', caption);
+    if (link) body.set('link', String(link));
+  }
+  const graphRes = await fetch(endpoint, { method: 'POST', body });
+  const posted = (await graphRes.json()) as { id?: string; post_id?: string; error?: { message: string } };
+  const postId = posted.post_id ?? posted.id;
+  if (!postId) {
     return Response.json({ error: posted.error?.message ?? 'Facebook rejected the post.' }, { status: 502, headers: cors });
   }
 
-  const postUrl = `https://www.facebook.com/${posted.id}`;
+  const postUrl = mediaType === 'video'
+    ? `https://www.facebook.com/watch/?v=${postId}` // videos process async; this resolves once ready
+    : `https://www.facebook.com/${postId}`;
   // Merge, never replace: results also carries notes and meeting keys.
-  const results = { ...(task.results ?? {}), metaPostId: posted.id, publishedAt: new Date().toISOString(), publishedBy: member.email, publishedTo: conn.name };
+  const results = { ...(task.results ?? {}), metaPostId: postId, mediaType: mediaType ?? null, publishedAt: new Date().toISOString(), publishedBy: member.email, publishedTo: conn.name };
   await admin.from('pm_tasks').update({
     status: 'Done', live_link: postUrl, results, updated_at: new Date().toISOString()
   }).eq('id', task.id);
   await admin.from('pm_task_activity').insert({
     task_id: task.id, actor_id: member.id, event_type: 'published',
-    detail: { postId: posted.id, page: conn.name }
+    detail: { postId, page: conn.name, mediaType: mediaType ?? null }
   });
 
-  return Response.json({ id: posted.id, url: postUrl, page: conn.name }, { headers: cors });
+  return Response.json({ id: postId, url: postUrl, page: conn.name }, { headers: cors });
 });
