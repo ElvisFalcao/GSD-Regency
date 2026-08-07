@@ -28,10 +28,15 @@ async function hmac(text: string) {
   return Array.from(new Uint8Array(sig)).map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-const page = (title: string, body: string) => new Response(
-  `<!doctype html><meta charset="utf-8"><title>${title}</title><body style="font-family:system-ui;display:grid;place-items:center;min-height:90vh;background:#f4f8f7"><div style="max-width:460px;background:#fff;border-radius:16px;padding:28px;box-shadow:0 20px 50px rgba(21,50,61,.15)"><h2 style="margin:0 0 10px;color:#1d3540">${title}</h2><div style="color:#51666e;font-size:14px;line-height:1.6">${body}</div></div>`,
-  { headers: { 'Content-Type': 'text/html; charset=utf-8' } }
-);
+// Headers set explicitly after construction: passed through the constructor's
+// options object they arrived at the browser as text/plain, which rendered
+// the page as raw source and mis-decoded every non-ASCII character.
+function page(title: string, body: string) {
+  const html = `<!doctype html><html><head><meta charset="utf-8"><title>${title}</title></head><body style="font-family:system-ui;display:grid;place-items:center;min-height:90vh;background:#f4f8f7"><div style="max-width:460px;background:#fff;border-radius:16px;padding:28px;box-shadow:0 20px 50px rgba(21,50,61,.15)"><h2 style="margin:0 0 10px;color:#1d3540">${title}</h2><div style="color:#51666e;font-size:14px;line-height:1.6">${body}</div></div></body></html>`;
+  const response = new Response(new TextEncoder().encode(html));
+  response.headers.set('content-type', 'text/html; charset=utf-8');
+  return response;
+}
 
 Deno.serve(async (request) => {
   if (request.method === 'OPTIONS') return new Response('ok', { headers: cors });
