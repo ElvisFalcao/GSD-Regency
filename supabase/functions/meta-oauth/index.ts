@@ -17,7 +17,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const GRAPH = 'https://graph.facebook.com/v21.0';
 const WORKSPACE = 'regency-shalina';
-const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, content-type' };
+const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, apikey, content-type, x-client-info' };
 
 const env = (key: string) => Deno.env.get(key) ?? '';
 const selfUrl = () => `${env('SUPABASE_URL')}/functions/v1/meta-oauth`;
