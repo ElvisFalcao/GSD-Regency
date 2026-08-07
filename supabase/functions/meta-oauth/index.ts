@@ -28,15 +28,14 @@ async function hmac(text: string) {
   return Array.from(new Uint8Array(sig)).map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-// Headers set explicitly after construction: passed through the constructor's
-// options object they arrived at the browser as text/plain, which rendered
-// the page as raw source and mis-decoded every non-ASCII character.
-function page(title: string, body: string) {
-  const html = `<!doctype html><html><head><meta charset="utf-8"><title>${title}</title></head><body style="font-family:system-ui;display:grid;place-items:center;min-height:90vh;background:#f4f8f7"><div style="max-width:460px;background:#fff;border-radius:16px;padding:28px;box-shadow:0 20px 50px rgba(21,50,61,.15)"><h2 style="margin:0 0 10px;color:#1d3540">${title}</h2><div style="color:#51666e;font-size:14px;line-height:1.6">${body}</div></div></body></html>`;
-  const response = new Response(new TextEncoder().encode(html));
-  response.headers.set('content-type', 'text/html; charset=utf-8');
-  return response;
-}
+// The gateway refuses to serve text/html from functions (it rewrites it to
+// text/plain — an anti-phishing measure on the shared domain), so the
+// callback never shows a page: it redirects back into GSD, which reads the
+// query parameters and shows the result as a toast.
+const RETURN_URL = () => env('META_RETURN_URL') || 'https://elvisfalcao.github.io/GSD-Regency/';
+const back = (params: Record<string, string>) =>
+  new Response(null, { status: 302, headers: { Location: `${RETURN_URL()}?${new URLSearchParams(params)}` } });
+const failPage = (reason: string) => back({ meta_error: reason });
 
 Deno.serve(async (request) => {
   if (request.method === 'OPTIONS') return new Response('ok', { headers: cors });
@@ -81,19 +80,19 @@ Deno.serve(async (request) => {
   const state = url.searchParams.get('state') ?? '';
   if (!code) {
     const reason = url.searchParams.get('error_description') || 'No authorisation code arrived.';
-    return page('Meta connection failed', reason);
+    return failPage(reason);
   }
   const parts = state.split(':');
   const sig = parts.pop() ?? '';
   const stamp = parts.join(':');
   if (sig !== await hmac(stamp) || Date.now() - Number(parts[0]) > 15 * 60_000) {
-    return page('Meta connection failed', 'The connection link is stale or was tampered with. Start again from GSD Workspace settings.');
+    return failPage('The connection link is stale or was tampered with. Try again from Workspace settings.');
   }
   const connectedBy = parts[1] || null;
 
   const tokenRes = await fetch(`${GRAPH}/oauth/access_token?client_id=${env('META_APP_ID')}&client_secret=${env('META_APP_SECRET')}&redirect_uri=${encodeURIComponent(selfUrl())}&code=${code}`);
   const shortToken = (await tokenRes.json()) as { access_token?: string; error?: { message: string } };
-  if (!shortToken.access_token) return page('Meta connection failed', shortToken.error?.message ?? 'Code exchange failed.');
+  if (!shortToken.access_token) return failPage(shortToken.error?.message ?? 'Code exchange failed.');
 
   const longRes = await fetch(`${GRAPH}/oauth/access_token?grant_type=fb_exchange_token&client_id=${env('META_APP_ID')}&client_secret=${env('META_APP_SECRET')}&fb_exchange_token=${shortToken.access_token}`);
   const long = (await longRes.json()) as { access_token?: string; expires_in?: number };
@@ -126,7 +125,7 @@ Deno.serve(async (request) => {
   }
   const { error } = await admin.from('pm_platform_connections')
     .upsert(rows, { onConflict: 'workspace_id,platform,kind,external_id' });
-  if (error) return page('Meta connection failed', `Could not store the connection: ${error.message}`);
+  if (error) return failPage(`Could not store the connection: ${error.message}`);
 
-  return page('✅ Meta connected', `Connected as <b>${me.name ?? 'unknown'}</b>: ${names.length ? names.map((n) => `<br>• ${n}`).join('') : 'no pages or ad accounts found on this Meta user'}.<br><br>Close this tab and return to GSD — the connections appear in Workspace settings.`);
+  return back({ meta: 'connected', who: me.name ?? '', assets: String(names.length) });
 });

@@ -57,6 +57,19 @@ function campaignOptions(selected = '') { return `<option value="">General / no 
 
 async function boot() {
   bindEvents();
+  // The Meta OAuth callback cannot show its own page (the functions gateway
+  // refuses text/html), so it redirects back here with the outcome in the
+  // query string and the app announces it.
+  const search = window.location?.search;
+  if (search) {
+    const q = new URLSearchParams(search);
+    if (q.has('meta') || q.has('meta_error')) {
+      setTimeout(() => toast(q.has('meta')
+        ? `✅ Meta connected — ${q.get('assets') || '0'} assets for ${q.get('who') || 'you'}. They are listed in Workspace settings.`
+        : `Meta connection failed: ${q.get('meta_error')}`), 700);
+      window.history?.replaceState(null, '', window.location.pathname);
+    }
+  }
   if (!configured) return startDemo();
   // A recovery link signs the user in with a short-lived session; until they
   // have chosen a new password, every other event must not hide that screen.
