@@ -57,11 +57,17 @@ Deno.serve(async (request) => {
 
     const stamp = `${Date.now()}:${member.email ?? user.email ?? ''}`;
     const state = `${stamp}:${await hmac(stamp)}`;
+    // Business apps prefer a login Configuration — a permission bundle built
+    // in the app dashboard, passed as config_id — over raw scopes. Raw scopes
+    // stay as the fallback, and Meta only accepts each one after it has been
+    // added inside its use case.
+    const configId = env('META_CONFIG_ID');
     const scopes = [
       'pages_show_list', 'pages_read_engagement', 'pages_manage_posts', 'read_insights',
       'instagram_basic', 'instagram_content_publish', 'ads_read', 'ads_management', 'business_management'
     ].join(',');
-    const consent = `https://www.facebook.com/v21.0/dialog/oauth?client_id=${env('META_APP_ID')}&redirect_uri=${encodeURIComponent(selfUrl())}&state=${encodeURIComponent(state)}&scope=${scopes}`;
+    const grant = configId ? `config_id=${configId}` : `scope=${scopes}`;
+    const consent = `https://www.facebook.com/v21.0/dialog/oauth?client_id=${env('META_APP_ID')}&redirect_uri=${encodeURIComponent(selfUrl())}&state=${encodeURIComponent(state)}&${grant}`;
     return Response.json({ url: consent }, { headers: cors });
   }
 
