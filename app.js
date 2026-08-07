@@ -583,9 +583,30 @@ function renderSettings() {
   $('settingsPanel').innerHTML = `<section class="setting"><h3>Waiting for access</h3>${requests}</section>`
     + `<section class="setting"><h3>Team, access and roles</h3><p>Click a role to grant or remove it. Access level cannot be changed on your own account.</p>${roster}</section>`
     + `<section class="setting"><h3>Workflow stages</h3><ul>${WORKFLOW_TEMPLATE.map((s) => `<li>${s.order}. ${s.name} → ${s.role}</li>`).join('')}</ul></section>`
+    + '<section class="setting"><h3>Platform connections</h3><div id="connectionsList" class="quiet-note">Loading…</div><menu><button id="connectMeta" class="secondary" type="button">Connect Meta</button></menu></section>'
     + '<section class="setting"><h3>Notification channels</h3><p><b>In-app:</b> active<br><b>Email:</b> configure Resend secret + verified sender<br><b>Teams:</b> inactive until IT approves a scoped channel integration.</p></section>';
 
   bindAdminControls();
+
+  $('connectMeta').onclick = guard(async () => {
+    if (!db) return toast('Demo mode cannot connect platforms.');
+    const url = await db.startMetaConnect(cfg.supabaseUrl, cfg.supabaseAnonKey);
+    window.open(url, '_blank');
+    toast('Approve the connection in the Meta tab, then reopen Workspace to see it listed.');
+  });
+  loadConnections();
+}
+
+// Names and expiry only — the tokens live in a table no browser can read.
+async function loadConnections() {
+  const el = $('connectionsList');
+  if (!db) { el.textContent = 'Demo mode — platform connections need the live workspace.'; return; }
+  try {
+    const rows = await db.listConnections();
+    el.innerHTML = rows.length
+      ? `<ul>${rows.map((r) => `<li><b>${escape(r.name || r.external_id)}</b> — ${escape(r.platform)} ${escape(r.kind)}${r.token_expires_at ? ` · renew by ${escape(String(r.token_expires_at).slice(0, 10))}` : ''}</li>`).join('')}</ul>`
+      : 'Nothing connected yet. Connect Meta to start posting, boosting and pulling metrics.';
+  } catch (error) { el.textContent = error.message; }
 }
 
 function bindAdminControls() {
