@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { addBusinessDays, createActivationTasks, normaliseRows, validateActivation, findHeaderRow, parseMoney, roleForAssetType, groupContentTasks, subtractBusinessDays, fluxPlanRows, detectBrand, buildPostPipeline } from '../lib/automation.js';
+import { addBusinessDays, createActivationTasks, normaliseRows, validateActivation, findHeaderRow, parseMoney, roleForAssetType, groupContentTasks, subtractBusinessDays, fluxPlanRows, detectBrand, buildPostPipeline, guessPage } from '../lib/automation.js';
 
 test('maps a published FluxPlanner plan onto the import row shape', () => {
   // Mirrors what FluxPlanner's budget-engine actually writes: DD/MM/YYYY
@@ -61,6 +61,25 @@ test('a fully delivered placement reads complete', () => {
   ], '2026-08-08');
   assert.equal(pipeline[0].current, 'complete');
   assert.equal(pipeline[0].overdue, false);
+});
+
+test('guesses the publishing page from brand and market, or refuses', () => {
+  const pages = [
+    { external_id: '1', name: 'Germol Care SA' },
+    { external_id: '2', name: 'Germol Care Kenya' },
+    { external_id: '3', name: 'GermolCuidados' },
+    { external_id: '4', name: 'Shaltoux Nigeria' },
+    { external_id: '5', name: "Shal'Artem Ghana" },
+    { external_id: '6', name: 'Grafx Studio' }
+  ];
+  assert.equal(guessPage(pages, 'Germol', 'South Africa')?.external_id, '1');
+  assert.equal(guessPage(pages, 'Germol', 'Kenya')?.external_id, '2');
+  assert.equal(guessPage(pages, 'Shaltoux', 'Nigeria')?.external_id, '4');
+  // Apostrophes in the brand must not break the match.
+  assert.equal(guessPage(pages, "Shal'Artem", 'Ghana')?.external_id, '5');
+  // A market hit without a brand hit is not a guess — wrong page = public mistake.
+  assert.equal(guessPage(pages, 'Ibucap', 'Nigeria'), null);
+  assert.equal(guessPage(pages, '', 'Nigeria'), null);
 });
 
 test('detects the brand a published plan belongs to', () => {

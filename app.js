@@ -1,4 +1,4 @@
-import { BRAND_CATALOG, PLATFORM_IDS, WORKFLOW_TEMPLATE, normaliseRows, validateActivation, createActivationTasks, taskFlags, findHeaderRow, groupContentTasks, detectBrand, buildPostPipeline } from './lib/automation.js';
+import { BRAND_CATALOG, PLATFORM_IDS, WORKFLOW_TEMPLATE, normaliseRows, validateActivation, createActivationTasks, taskFlags, findHeaderRow, groupContentTasks, detectBrand, buildPostPipeline, guessPage } from './lib/automation.js';
 import { createDataLayer, capabilities } from './lib/data.js';
 
 const cfg = window.PM_CONFIG || {};
@@ -732,10 +732,74 @@ function renderTaskDialog(isNew) {
     <label>Due date<input id="editDue" type="date" value="${activeTask.dueDate}" ${locked ? 'disabled' : ''} /></label>
     <label>Live post / supporting link<input id="editLink" type="url" value="${escape(activeTask.liveLink || '')}" placeholder="https://" ${locked && !mine ? 'disabled' : ''} /></label>
     <label>Notes / results<textarea id="editResults" placeholder="Brief, context, results or next action…" ${locked && !mine ? 'disabled' : ''}>${escape(activeTask.notes || '')}</textarea></label>
-  </div>${locked ? `<p class="quiet-note">${mine ? 'You can update status, links and notes on your own task. Reassigning and rescheduling is done by Shane, Elvis or Zaida.' : 'This task belongs to someone else, so it is read-only for you.'}</p>` : ''}`;
+  </div>${locked ? `<p class="quiet-note">${mine ? 'You can update status, links and notes on your own task. Reassigning and rescheduling is done by Shane, Elvis or Zaida.' : 'This task belongs to someone else, so it is read-only for you.'}</p>` : ''}${publishBox()}`;
   $('deleteTask').classList.toggle('hidden', isNew || !can.isManager);
+  bindPublishBox();
   $('editType').onchange = () => $('editTypeCustom').classList.toggle('hidden', $('editType').value !== CUSTOM_TYPE);
   $('taskDialog').showModal();
+}
+
+// --- publishing ----------------------------------------------------------
+// A Post task publishes to a connected Facebook page from inside its dialog.
+// The page is guessed from the campaign's brand and market but always shown
+// for confirmation — a wrong page is a public mistake.
+
+function canPublish() {
+  return Boolean(db && can.isManager && activeTask?.id && activeTask.type === 'Post');
+}
+
+function publishBox() {
+  if (!canPublish()) return '';
+  if (activeTask.platform === 'Instagram') {
+    return '<div class="publish-box"><p class="eyebrow">PUBLISH</p><p class="quiet-note">Instagram publishing unlocks once the Instagram connection is added — reconnect Meta with the Instagram permissions ticked.</p></div>';
+  }
+  if (activeTask.liveLink) {
+    return `<div class="publish-box"><p class="eyebrow">PUBLISHED</p><p class="quiet-note">Live at <a href="${escape(activeTask.liveLink)}" target="_blank" rel="noopener">${escape(activeTask.liveLink)}</a></p></div>`;
+  }
+  return `<div class="publish-box"><p class="eyebrow">PUBLISH TO FACEBOOK</p>
+    <label>Page<select id="pubPage"><option value="">Loading pages…</option></select></label>
+    <label>Caption<textarea id="pubMessage" placeholder="Write the caption…">${escape(activeTask.notes || '')}</textarea></label>
+    <label>Link to attach (optional)<input id="pubLink" type="url" placeholder="https://" /></label>
+    <button id="pubGo" class="primary" type="button">Post now</button>
+    <p class="quiet-note">Posts publicly to the selected page, marks this task Done and saves the post link here.</p>
+  </div>`;
+}
+
+function bindPublishBox() {
+  if (!canPublish() || activeTask.liveLink || activeTask.platform === 'Instagram') return;
+  loadPublishPages();
+  const go = $('pubGo');
+  if (!go) return;
+  go.onclick = guard(async () => {
+    const pageId = $('pubPage').value;
+    const message = $('pubMessage').value.trim();
+    if (!pageId) return toast('Choose the page to post to.');
+    if (!message) return toast('Write the caption first.');
+    const pageName = $('pubPage').selectedOptions?.[0]?.text || 'the selected page';
+    if (!window.confirm(`Post this publicly to ${pageName} now?`)) return;
+    go.disabled = true;
+    try {
+      const out = await db.publishTask({ taskId: activeTask.id, pageId, message, link: $('pubLink').value.trim() }, cfg.supabaseUrl, cfg.supabaseAnonKey);
+      const index = state.tasks.findIndex((t) => t.id === activeTask.id);
+      if (index >= 0) state.tasks[index] = { ...state.tasks[index], status: 'Done', liveLink: out.url };
+      $('taskDialog').close();
+      render();
+      toast(`✅ Posted to ${out.page} — the link is saved on the task.`);
+    } finally { go.disabled = false; }
+  });
+}
+
+async function loadPublishPages() {
+  const select = $('pubPage');
+  if (!select) return;
+  try {
+    const pages = (await db.listConnections()).filter((r) => r.kind === 'page');
+    if (!pages.length) { select.innerHTML = '<option value="">No pages connected — see Workspace settings</option>'; return; }
+    const campaign = state.campaigns.find((c) => c.id === activeTask.campaignId);
+    const guess = guessPage(pages, campaign?.brand || '', activeTask.market || campaign?.market || '');
+    select.innerHTML = '<option value="">Choose a page…</option>'
+      + pages.map((p) => `<option value="${escape(p.external_id)}" ${guess && p.external_id === guess.external_id ? 'selected' : ''}>${escape(p.name || p.external_id)}</option>`).join('');
+  } catch (error) { select.innerHTML = `<option value="">${escape(error.message)}</option>`; }
 }
 
 async function saveTask() {
